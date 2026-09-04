@@ -1,0 +1,21 @@
+{
+  "name": "bible-pixel-battle",
+  "version": "2.0.0",
+  "description": "성경 픽셀 배틀 — 실시간 멀티플레이 퀴즈 배틀",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "load": "node load.js 60 45"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
