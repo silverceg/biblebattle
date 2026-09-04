@@ -215,11 +215,14 @@
     if (name === "victory") el.onended = () => { if (mp3El === el) { mp3El = null; mp3Track = null; } };
   }
 
+  let victoryEl = null, pendingTrack = null;
   function music(name, opt) {
     if (!boot()) return;
     resume();
     if (name === cur) return;
     cur = name;
+    // 승리 곡(victory.mp3)이 나오는 중이면 끝난 뒤에 시작 — 두 곡이 겹치지 않게
+    if (victoryEl && !victoryEl.ended && !victoryEl.paused) { pendingTrack = name; stopMp3(.4); fade(0, .3); clearInterval(timer); timer = null; return; }
     const src = name && pickMp3(name);
     if (src) {                                  // mp3 가 있으면 8비트를 끄고 mp3
       fade(0, .4); clearInterval(timer); timer = null;
@@ -231,9 +234,19 @@
     if (!timer) timer = setInterval(schedule, 30);
     fade(on ? 1 : 0, (opt && opt.fade) || .5);
   }
-  /* 팡파레: victory.mp3 가 있으면 그걸, 없으면 8비트 */
-  function fanfareMp3() { const src = pickMp3("victory"); if (!src) return false;
-    const el = new Audio(src); el.volume = on ? MP3_VOL : 0; el.play().catch(() => {}); return true; }
+  /* 팡파레: victory.mp3 가 있으면 그걸(다른 음악은 멈췄다가 끝나면 재개), 없으면 8비트 */
+  function fanfareMp3() {
+    const src = pickMp3("victory"); if (!src) return false;
+    if (victoryEl && !victoryEl.ended) return true;               // 이미 나오는 중이면 겹치지 않게
+    stopMp3(.3); fade(0, .3); clearInterval(timer); timer = null; // 배경음악 정지
+    const el = new Audio(src); el.volume = on ? MP3_VOL : 0; el.play().catch(() => {});
+    victoryEl = el; pendingTrack = cur;
+    const done = () => { if (victoryEl !== el) return; victoryEl = null; const nx = pendingTrack; pendingTrack = null;
+      if (nx) { cur = null; music(nx); } };
+    el.onended = done; el.onerror = done;
+    setTimeout(() => { if (victoryEl === el && !el.ended) { el.pause(); done(); } }, 90000);   // 최대 90초
+    return true;
+  }
   function fade(v, sec) {
     if (!musicGain) return;
     const t = AC.currentTime;
@@ -252,8 +265,8 @@
     setIntensity(v){ intensity = Math.max(.9, Math.min(1.35, v || 1)); if (mp3El) mp3El.playbackRate = intensity; },
     toggle(){
       on = !on;
-      if (!on) { fade(0, .2); if (mp3El) mp3El.volume = 0; }
-      else { boot(); resume(); if (cur && !mp3El) fade(1, .3); if (mp3El) { mp3El.volume = MP3_VOL; mp3El.play().catch(() => {}); } }
+      if (!on) { fade(0, .2); if (mp3El) mp3El.volume = 0; if (victoryEl) victoryEl.volume = 0; }
+      else { boot(); resume(); if (cur && !mp3El && !victoryEl) fade(1, .3); if (mp3El) { mp3El.volume = MP3_VOL; mp3El.play().catch(() => {}); } if (victoryEl) victoryEl.volume = MP3_VOL; }
       try { localStorage.setItem("bpb_sound", on ? "1" : "0"); } catch {}
       return on;
     },
