@@ -200,7 +200,12 @@ input:focus{outline:none;border-color:var(--yellow)}
 .golden.on{display:block}
 @keyframes gold{50%{filter:brightness(1.25)}}
 .qbtn{width:36px;height:30px;border-radius:10px;background:rgba(10,15,30,.85);border:2px solid var(--line);font-size:13px;color:var(--yellow)}
-.qpanel{position:absolute;right:12px;top:80px;width:230px;z-index:7;padding:9px;display:none}
+.qpanel{position:absolute;right:12px;top:80px;width:250px;max-height:70%;overflow-y:auto;touch-action:pan-y;z-index:7;padding:9px;display:none}
+.pk{display:flex;gap:6px;font-size:10px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08);line-height:1.4;align-items:center}
+.pk .lv{font-family:var(--dp);font-size:11px;color:#fff;background:var(--blue);border-radius:6px;padding:0 5px;flex-shrink:0}
+.pk b{font-family:var(--dp);font-weight:400;color:#fff;font-size:11px}
+.pk.lock{opacity:.4;filter:grayscale(1)}
+.pk.now{background:rgba(46,211,198,.15);border-radius:6px}
 .qpanel.on{display:block}
 .qpanel h4{font-family:var(--dp);font-size:13px;color:var(--yellow);margin-bottom:6px}
 .qi{display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)}
@@ -210,10 +215,25 @@ input:focus{outline:none;border-color:var(--yellow)}
 .qi .bn{color:var(--yellow);font-family:var(--dp)}
 .qi.done{opacity:.55}.qi.done .nm::after{content:" ✓";color:var(--green)}
 .tierbadge{font-size:10px;font-weight:800;color:var(--yellow)}
-.lvl{display:flex;align-items:center;gap:6px;margin-top:2px}
-.lvl b{font-family:var(--dp);font-size:12px;color:#fff;background:linear-gradient(180deg,#7CC7FF,var(--blue));border:2px solid var(--line);border-radius:8px;padding:0 6px;font-weight:400}
-.lvl .xpb{width:70px;height:6px;background:rgba(0,0,0,.45);border-radius:99px;border:1px solid var(--line);overflow:hidden}
-.lvl .xpb i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--teal));transition:width .3s}
+.lvl{display:flex;align-items:center;gap:6px;margin-top:3px}
+.lvl b{font-family:var(--dp);font-size:14px;color:#fff;background:linear-gradient(180deg,#7CC7FF,var(--blue));border:2px solid var(--line);border-radius:9px;padding:1px 8px;font-weight:400;box-shadow:0 2px 0 #0B4F8F}
+.lvl b.pop{animation:lvPop .6s cubic-bezier(.2,1.8,.4,1)}
+@keyframes lvPop{0%{transform:scale(1)}40%{transform:scale(1.5)}100%{transform:scale(1)}}
+.lvl .xpb{position:relative;width:120px;height:12px;background:rgba(0,0,0,.5);border-radius:99px;border:2px solid var(--line);overflow:hidden}
+.lvl .xpb i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--teal));transition:width .35s}
+.lvl .xpb i.flash{animation:xpFlash .5s}
+@keyframes xpFlash{50%{filter:brightness(1.8)}}
+.lvl .xpb span{position:absolute;inset:0;font-size:9px;font-weight:800;color:#fff;text-align:center;line-height:9px;text-shadow:1px 1px 0 var(--line)}
+.xpgain{position:absolute;left:190px;top:36px;z-index:5;pointer-events:none;font-family:var(--dp);font-size:15px;color:var(--teal);text-shadow:2px 2px 0 var(--line);opacity:0}
+.xpgain.on{animation:xg 1.3s ease-out forwards}
+@keyframes xg{0%{opacity:0;transform:translateY(8px)}15%{opacity:1;transform:none}75%{opacity:1}100%{opacity:0;transform:translateY(-14px)}}
+.lvup{position:absolute;inset:0;z-index:46;pointer-events:none;display:none;place-items:center;overflow:hidden}
+.lvup.on{display:grid}
+.lvup .ray{position:absolute;inset:-40%;opacity:.28;color:var(--blue);background:repeating-conic-gradient(from 0deg,currentColor 0 6deg,transparent 6deg 16deg);animation:spin 6s linear infinite}
+.lvup .t{position:relative;text-align:center;animation:bmIn .45s cubic-bezier(.2,1.7,.4,1)}
+.lvup .t .a{font-family:var(--dp);font-size:20px;color:#fff;text-shadow:2px 2px 0 var(--line)}
+.lvup .t .b{font-family:var(--dp);font-size:64px;line-height:1;color:var(--teal);text-shadow:4px 4px 0 var(--line),0 0 30px rgba(46,211,198,.7)}
+.lvup .t .c{font-family:var(--dp);font-size:14px;color:var(--yellow);background:rgba(10,15,30,.85);border:2px solid var(--yellow);border-radius:999px;padding:4px 14px;display:inline-block;margin-top:6px}
 .keys{font-family:var(--dp);font-size:12px;color:var(--yellow)}
 .zonebn{position:absolute;left:50%;top:26%;transform:translate(-50%,-50%);z-index:44;pointer-events:none;display:none;text-align:center}
 .zonebn.on{display:block;animation:zb 2.6s ease-out forwards}
@@ -225,6 +245,37 @@ input:focus{outline:none;border-color:var(--yellow)}
 .chan.on{display:block}
 .chan::after{content:"열기";position:absolute;inset:8px;border-radius:50%;background:rgba(10,15,30,.85);display:grid;place-items:center;font-family:var(--dp);font-size:12px;color:#fff}
 .mini-duel .qcard{border-color:var(--teal)}
+/* ══ 대기 라운지 (시작 전 폰 화면) ══ */
+.lounge{position:absolute;inset:0;z-index:8;display:none;grid-template-columns:200px 1fr 150px;gap:10px;padding:44px 12px 10px;
+  background:radial-gradient(800px 400px at 50% 0%,#1E3562,transparent 70%),rgba(11,20,38,.96)}
+.lounge.on{display:grid}
+.lg-me{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px;text-align:center}
+.lg-me canvas{width:120px;height:120px;cursor:pointer}
+.lg-me .nm{font-family:var(--dp);font-size:16px}
+.lg-me .cls{font-size:11px;color:var(--dim);font-weight:700;line-height:1.5}
+.lg-me .tierrow{display:flex;gap:3px;margin-top:4px}
+.lg-me .tierrow i{width:22px;height:22px;border-radius:6px;background:rgba(0,0,0,.35);border:2px solid var(--line);display:grid;place-items:center;font-size:11px;font-style:normal;cursor:pointer}
+.lg-me .tierrow i.on{border-color:var(--yellow);background:rgba(255,201,60,.2)}
+.lg-me .hint{font-size:10px;color:var(--dim);font-weight:700}
+.lg-quiz{display:flex;flex-direction:column;padding:10px 14px;min-height:0}
+.lg-quiz .top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.lg-quiz .top h4{font-family:var(--dp);font-size:17px;color:var(--yellow)}
+.lg-quiz .top .bonus{margin-left:auto;font-family:var(--dp);font-size:12px;color:var(--teal);background:rgba(0,0,0,.35);border:2px solid var(--line);border-radius:999px;padding:2px 10px}
+.lg-quiz .q{font-family:var(--dp);font-size:15px;line-height:1.45;word-break:keep-all;white-space:pre-line;min-height:44px;margin-bottom:8px}
+.lg-quiz .ops{display:grid;grid-template-columns:1fr 1fr;gap:7px;flex:1;min-height:0}
+.lg-quiz .ops .dop{padding:8px 10px}
+.lg-quiz .fb{margin-top:6px;font-size:11px;font-weight:700;line-height:1.5;min-height:30px;color:var(--dim)}
+.lg-quiz .fb b{color:var(--green);font-family:var(--dp);font-weight:400;font-size:13px}
+.lg-quiz .fb.bad b{color:var(--red)}
+.lg-who{padding:10px;display:flex;flex-direction:column;min-height:0}
+.lg-who h4{font-family:var(--dp);font-size:14px;color:var(--yellow);margin-bottom:6px}
+.lg-who .cnt{font-family:var(--dp);font-size:30px;line-height:1;color:#fff;text-shadow:2px 2px 0 var(--line)}
+.lg-who .cnt small{font-size:11px;color:var(--dim)}
+.lg-who .list{flex:1;overflow-y:auto;touch-action:pan-y;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;margin-top:6px}
+.lg-who .list canvas{width:30px;height:30px;animation:bmIn .35s cubic-bezier(.2,1.6,.4,1) both}
+.lg-who .wait{font-family:var(--dp);font-size:11px;color:var(--dim);margin-top:6px;animation:pulse 1.4s infinite;text-align:center}
+.lg-tip{position:absolute;left:12px;right:12px;bottom:6px;font-size:11px;font-weight:700;color:var(--dim);text-align:center;pointer-events:none}
+.lg-tip b{color:var(--yellow)}
 .mini-duel .vsintro{display:none !important}
 .flash.go{animation:fl .5s ease-out}
 @keyframes fl{0%{opacity:.65}100%{opacity:0}}
@@ -432,7 +483,8 @@ input:focus{outline:none;border-color:var(--yellow)}
     <div class="hud">
       <div class="me"><div class="av"><canvas id="h-av" width="26" height="26"></canvas></div>
         <div><div class="nm ot" id="h-nm"></div><div class="rk" id="h-rk"></div><div class="tierbadge" id="h-tier"></div><div class="htitle" id="h-title"></div>
-          <div class="lvl"><b id="h-lv">Lv.1</b><div class="xpb"><i id="h-xp"></i></div><span class="keys" id="h-keys"></span></div></div></div>
+          <div class="lvl"><b id="h-lv">Lv.1</b><div class="xpb"><i id="h-xp"></i><span id="h-xpt"></span></div><span class="keys" id="h-keys"></span></div></div></div>
+      <div class="xpgain" id="xpgain"></div>
       <div class="timer ot" id="h-cl">--:--</div>
       <div class="trophy"><span class="ic">🏆</span><b id="h-sc">0</b><small id="h-wl"></small></div>
     </div>
@@ -451,10 +503,19 @@ input:focus{outline:none;border-color:var(--yellow)}
       <button class="dodge ot" id="dodge"><span id="dodge-t">회피</span><div class="cool" id="cool"></div></button>
     </div>
     <div class="golden" id="golden">⚡ 골든타임 · 점수 2배</div>
+    <div class="lounge" id="lounge">
+      <div class="card lg-me"><canvas id="lg-cv" width="120" height="120"></canvas><div class="nm" id="lg-nm"></div><div class="cls" id="lg-cls"></div>
+        <div class="tierrow" id="lg-tiers"></div><div class="hint">계급을 눌러 외형 미리보기 · 캐릭터를 눌러 인사</div></div>
+      <div class="card lg-quiz"><div class="top"><h4>📖 연습 퀴즈</h4><span class="bonus" id="lg-bonus">출발 보너스 0/30 XP</span></div>
+        <div class="q" id="lg-q">문제를 불러오는 중…</div><div class="ops" id="lg-ops"></div><div class="fb" id="lg-fb">맞히면 해설이 나와요. 3문제 맞히면 시작할 때 30 XP를 받습니다.</div></div>
+      <div class="card lg-who"><h4>👥 입장 현황</h4><div class="cnt"><span id="lg-cnt">0</span><small> 명</small></div><div class="list" id="lg-list"></div><div class="wait">선생님이 시작하면 바로 출발!</div></div>
+      <div class="lg-tip" id="lg-tip"></div>
+    </div>
     <div class="zonebn" id="zonebn"><div class="n" id="zb-n"></div><div class="d" id="zb-d"></div></div>
+    <div class="lvup" id="lvup"><div class="ray"></div><div class="t"><div class="a">LEVEL UP</div><div class="b" id="lvup-n">2</div><div class="c" id="lvup-p"></div></div></div>
     <div class="chan" id="chan"></div>
     <div class="bigmsg" id="bigmsg"><div class="ic" id="bm-ic"></div><div class="nm" id="bm-nm"></div><div class="ef" id="bm-ef"></div></div>
-    <div class="card qpanel" id="qpanel"><h4>📜 도전과제</h4><div id="qlist"></div><div class="bag"><h4>🎒 내 아이템</h4><div id="bag"></div></div></div>
+    <div class="card qpanel" id="qpanel"><h4>📜 도전과제</h4><div id="qlist"></div><div class="bag"><h4>⬆ 레벨 특성</h4><div id="perks"></div><h4>🎒 내 아이템</h4><div id="bag"></div></div></div>
     <div class="card itemcard" id="itemcard"></div>
     <div class="down" id="down"><div class="b"><div class="t">쓰러졌다!</div><div class="n" id="downn">5</div><div class="s">다른 곳에서 다시 일어납니다</div></div></div>
     <div class="toast" id="toast"></div>
@@ -490,15 +551,15 @@ input:focus{outline:none;border-color:var(--yellow)}
 <div class="helpbox" id="helpbox"><div class="grid" id="helpgrid"></div><button class="b3" id="helpclose" style="margin-top:10px">닫기</button></div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/sprite.js?v=15"></script>
-<script src="/audio.js?v=15"></script>
+<script src="/sprite.js?v=20"></script>
+<script src="/audio.js?v=20"></script>
 <script>
 const $ = (i) => document.getElementById(i);
 const socket = io({ transports: ["websocket", "polling"] });
 const KEY = "bpb_player", DEX = "bpb_cards", TITLES = "bpb_titles", STK = "bpb_stickers";
 const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
-let EMOTES = [], BOSSINFO = {}, ZONES = [], MINFO = {};
+let EMOTES = [], BOSSINFO = {}, ZONES = [], MINFO = {}, PERKS = [];
 const minions = new Map();
 let me = JSON.parse(localStorage.getItem(KEY) || "null");
 let look = me?.look || PX.randomLook();
@@ -516,6 +577,13 @@ function drawEmote(x, y, idx){ const txt = EMOTES[idx - 1]; if (!txt) return;
   cx.fillStyle = "#fff"; roundRect(bx - tw/2, by - 13, tw, 26, 13); cx.fill();
   cx.beginPath(); cx.moveTo(bx - 6, by + 12); cx.lineTo(bx + 6, by + 12); cx.lineTo(bx, by + 20); cx.closePath(); cx.fill();
   cx.fillStyle = "#1A1200"; cx.fillText(txt, bx, by + 1); }
+function levelAura(x, y, size, lv, t){
+  if (lv < 5) return;
+  const col = lv >= 10 ? "#FFC93C" : lv >= 8 ? "#C9A9FF" : "#2ED3C6";
+  cx.save(); cx.globalAlpha = .55 + .2*Math.sin(t/300); cx.strokeStyle = col; cx.lineWidth = lv >= 10 ? 3 : 2; cx.setLineDash(lv >= 10 ? [] : [6,5]);
+  cx.beginPath(); cx.ellipse(x, y + size*.44, size*.5, size*.2, 0, 0, 7); cx.stroke(); cx.setLineDash([]); cx.restore();
+  if (lv >= 8 && Math.random() < (lv >= 10 ? .35 : .15)) parts.push({ x: x + (Math.random()-.5)*36, y: y + size*.3, vx: 0, vy: -.8, life: .7, c: col, s: 2.5 });
+}
 function drawGlow(x, y, size){ const t = Date.now(); cx.save(); cx.globalAlpha = .55 + .3*Math.sin(t/80);
   for (let k = 0; k < 8; k++) { const a = k * .785 + t/300; cx.strokeStyle = "#FFC93C"; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(x + Math.cos(a)*size*.5, y + Math.sin(a)*size*.5); cx.lineTo(x + Math.cos(a)*size*.95, y + Math.sin(a)*size*.95); cx.stroke(); }
   cx.restore(); if (Math.random() < .5) parts.push({ x: x + (Math.random()-.5)*40, y: y + (Math.random()-.5)*40, vx: 0, vy: -1.2, life: .8, c: "#FFC93C", s: 3 }); }
@@ -607,7 +675,7 @@ $("helpclose").onclick = () => $("helpbox").classList.remove("on");
   setTimeout(() => { if (!$("splash").classList.contains("off")) $("splash").querySelector(".tap").textContent = "터치해서 시작"; }, 4000);
 })();
 fetch("/api/join-info").then(r => r.json()).then(d => {
-  TEAMS = d.teams || []; EMOTES = d.emotes || []; BOSSINFO = d.bosses || {}; ZONES = d.zones || []; MINFO = d.minions || {};
+  TEAMS = d.teams || []; EMOTES = d.emotes || []; BOSSINFO = d.bosses || {}; ZONES = d.zones || []; MINFO = d.minions || {}; PERKS = d.perks || [];
   const h = $("helpgrid"); h.innerHTML = "";
   const add = (i, n, t) => { const e = document.createElement("div"); e.className = "hi"; e.innerHTML = `<span>${i}</span><span><b>${esc(n)}</b><br>${esc(t)}</span>`; h.appendChild(e); };
   Object.values(d.items).forEach(v => add(v.icon, v.name, v.desc));
@@ -617,9 +685,10 @@ fetch("/api/join-info").then(r => r.json()).then(d => {
   add("⚔","대결 중 정지","대결이 걸리면 두 사람은 멈춥니다. 지면 3초 뒤 다른 곳에서 부활");
   add("🗡","은신 기습","수풀에 숨거나 구름 기둥 상태면 대결이 자동으로 안 걸립니다. 가까이 가서 '기습' 버튼 → 상대는 1.5초 동안 답을 못 고름. 기습 성공 시 +1");
   add("🏅","칭호·전리품","이기면 전리품 스티커, 판이 끝나면 칭호. 게임엔 영향 없는 명예입니다. 폰에 계속 쌓입니다");
-  add("⬆","레벨","대결·미니언·상자·거점으로 경험치를 모아 레벨업(1~10). 레벨당 속도 +2%, 대결 시간 +0.3초");
+  add("⬆","레벨업 보상","레벨업마다 +1점(5레벨 +2, 10레벨 +3). 2레벨부터 매 레벨 새 특성 해금 — 📜 버튼에서 목록 확인. 낮은 레벨이 높은 레벨을 이기면 경험치 최대 3배(하극상)");
   add("🦊","미니언","병사·여우·메뚜기. 부딪히면 쉬운 문제 6초. 맞히면 경험치, 틀려도 손해 없음. 🔑 열쇠를 떨어뜨립니다");
   add("📦","상자 조건","나무: 2.5초 서 있기 · 금테: 자물쇠 퀴즈 · 전설·황금: 🔑 열쇠 필요");
+  add("⚔","상대 찾기","가까운 상대가 화면 밖에 있으면 내 캐릭터 옆에 노란 화살표와 거리가 뜹니다. 그쪽으로 가세요");
   add("🗺","구역 6곳","에덴 동산(구약) · 광야(교재 문답) · 시내산·예루살렘(암송 구절) · 갈릴리(신약) · 바벨론(어려움). 들어가면 이름이 뜹니다");
   add("💎","숨겨진 보물","가끔 나타납니다. 먼저 밟으면 +5점");
   add("🌀","포탈","보라색 소용돌이를 밟으면 반대편으로 순간이동");
@@ -740,6 +809,56 @@ socket.on("me", (f) => {
   paintHud(f);
 });
 
+/* ── 대기 라운지 ── */
+const WTIP = [
+  "⚔ 다른 사람과 가까워지면 <b>성경 퀴즈 대결</b> — 먼저 맞히면 +1",
+  "🧭 화면을 <b>누른 채 끌면</b> 이동 · 오른쪽 아래 큰 원은 <b>회피</b>",
+  "☠ 보스는 <b>틀리면 즉시 패배</b>, 이기면 +2~6점 · 골리앗은 돌진, 헤롯은 순간이동",
+  "🦊 미니언은 <b>틀려도 손해 없음</b> — 경험치와 🔑 열쇠를 줍니다",
+  "📦 나무 상자는 <b>2.5초 서 있기</b>, 금테는 퀴즈, 보라·황금은 열쇠",
+  "⬆ <b>레벨업마다 +1점</b> · 낮은 레벨이 높은 레벨을 이기면 경험치 최대 3배",
+  "🌿 수풀에 숨으면 대결이 안 걸립니다 — 옆에 가서 <b>기습!</b>",
+  "⚡ 마지막 1분은 <b>모든 점수 2배</b> · 1위에겐 👑, 잡으면 +2",
+];
+let lgTip = 0, lgTipT = 0, lgTier = 0, lgEmote = 0, lgEmoteT = 0, lgWaitingQ = false, lgLast = null;
+function lgAsk(){ if (lgWaitingQ) return; lgWaitingQ = true; $("lg-q").textContent = "문제를 불러오는 중…"; $("lg-ops").innerHTML = ""; socket.emit("practice:get"); }
+socket.on("practice:q", (q) => {
+  lgWaitingQ = false; lgLast = q;
+  $("lg-q").textContent = q.text; const o = $("lg-ops"); o.innerHTML = "";
+  q.options.forEach((op, i) => { const b = document.createElement("button"); b.className = "dop d" + i; b.innerHTML = `<span class="s">${LET[i]}</span><span class="l"></span>`; b.querySelector(".l").textContent = op;
+    b.onclick = () => { [...o.children].forEach(c => c.style.pointerEvents = "none"); b.classList.add("pickme"); SFX.play("click"); buzz(15); socket.emit("practice:answer", { choice: i }); }; o.appendChild(b); });
+});
+socket.on("practice:r", (r) => {
+  const o = $("lg-ops"); [...o.children].forEach((c, i) => { c.classList.remove("pickme"); if (i === r.answer) c.style.outline = "4px solid var(--green)"; else if (c.classList.contains("pickme") === false && c.style.pointerEvents === "none") {} });
+  const fb = $("lg-fb"); fb.className = "fb" + (r.ok ? "" : " bad");
+  fb.innerHTML = `<b>${r.ok ? "정답!" : "아쉬워요"}</b> 정답은 <b style="color:var(--green)">${esc(lgLast ? lgLast.options[r.answer] : "")}</b>${r.ref ? ` <span style="color:var(--yellow)">(${esc(r.ref)})</span>` : ""}<br>${esc(r.exp || "")}`;
+  $("lg-bonus").textContent = `출발 보너스 ${r.bonus}/30 XP`;
+  if (r.ok) { SFX.play("correct"); spark(cv.clientWidth/2, cv.clientHeight/2, "#3DD68C", 16, 3); } else SFX.play("wrong");
+  setTimeout(lgAsk, 2600);
+});
+$("lg-cv").addEventListener("click", () => { lgEmote = 1 + (Math.random() * Math.max(1, EMOTES.length) | 0); lgEmoteT = Date.now() + 2200; SFX.play("click"); buzz(15); });
+function lgTiers(){ const box = $("lg-tiers"); if (box.children.length) return; ["🐑","🗡","🛡","⚔","📜","👑"].forEach((ic, t) => { const i = document.createElement("i"); i.textContent = ic; i.className = t === 0 ? "on" : "";
+  i.onclick = () => { lgTier = t; [...box.children].forEach((c, k) => c.classList.toggle("on", k === t)); SFX.play("move"); }; box.appendChild(i); }); }
+let lgWasOn = false, lgSeen = new Set();
+setInterval(() => {
+  const on = F && F.ph === "lobby" && $("play").classList.contains("on") && !D;
+  const el = $("lounge"); el.classList.toggle("on", !!on);
+  if (!on) { lgWasOn = false; return; }
+  if (!lgWasOn) { lgWasOn = true; lgTiers(); $("lg-nm").textContent = me ? me.name : ""; const it = PX.ITEMS.find(x => x.id === (me && me.cls)); $("lg-cls").textContent = it ? `${it.name} 특성 — ${it.desc}` : ""; lgAsk(); }
+  // 내 캐릭터 (계급 미리보기 + 이모트)
+  const g = $("lg-cv").getContext("2d"); g.imageSmoothingEnabled = false; g.clearRect(0, 0, 120, 120);
+  g.fillStyle = "rgba(255,201,60,.25)"; g.beginPath(); g.ellipse(60, 110, 40, 12, 0, 0, 7); g.fill();
+  PX.drawChar(g, 60, 112, 100, { ...look, tier: lgTier }, PX.animFrame(false, 0, Date.now()), Math.floor(Date.now() / 2600) % 2 === 1);
+  if (Date.now() < lgEmoteT && EMOTES[lgEmote - 1]) { const txt = EMOTES[lgEmote - 1]; g.font = "700 12px " + getComputedStyle(document.body).getPropertyValue("--dp"); g.textAlign = "center"; g.textBaseline = "middle";
+    const tw = g.measureText(txt).width + 14; g.fillStyle = "#fff"; g.beginPath(); g.roundRect(60 - tw/2, 2, tw, 22, 11); g.fill(); g.fillStyle = "#1A1200"; g.fillText(txt, 60, 13); }
+  // 입장 현황
+  $("lg-cnt").textContent = roster.size;
+  const list = $("lg-list");
+  roster.forEach((p, u) => { if (lgSeen.has(u)) return; lgSeen.add(u); const c = document.createElement("canvas"); c.width = c.height = 34; c.title = p.n; c._lk = p.l; list.appendChild(c); });
+  [...list.children].forEach((c, i) => { const g2 = c.getContext("2d"); g2.imageSmoothingEnabled = false; g2.clearRect(0, 0, 34, 34); PX.drawChar(g2, 17, 33, 30, c._lk, PX.animFrame(false, 0, Date.now() + i * 190), false); });
+  // 팁
+  if (Date.now() - lgTipT > 6000) { lgTipT = Date.now(); $("lg-tip").innerHTML = WTIP[lgTip++ % WTIP.length]; }
+}, 160);
 /* ── HUD ── */
 function paintHud(f){
   const mm = Math.floor(f.t/60), ss = f.t % 60;
@@ -775,6 +894,12 @@ function paintHud(f){
     d.textContent = f.amb ? "🗡 기습 가능! 버튼을 누르세요" : "🗡 은신 중 — 가까이 가서 기습"; b.appendChild(d); }
   $("cool").style.setProperty("--p", (100 - Math.min(100, f.dodge / 40 * 100)) + "%");
 }
+function paintXp(level, xp, base, next){
+  const lv = $("h-lv"); if (lv.textContent !== "Lv." + level) { lv.textContent = "Lv." + level; lv.classList.remove("pop"); void lv.offsetWidth; lv.classList.add("pop"); }
+  const span = Math.max(1, next - base), cur = Math.max(0, xp - base);
+  $("h-xp").style.width = (level >= 10 ? 100 : Math.min(100, cur / span * 100)) + "%";
+  $("h-xpt").textContent = level >= 10 ? "MAX" : `${cur} / ${span} · 다음 레벨까지 ${span - cur}`;
+}
 function paintMeta(m){
   MODE = m.mode;
   if (F && (F.ph === "lobby" || F.ph === "countdown")) prevMy = null;
@@ -790,8 +915,11 @@ function paintMeta(m){
   const bag = $("bag"); bag.innerHTML = m.items.length ? m.items.map(it => `<div class="bi"><span>${it.icon}</span><span><b>${esc(it.name)}</b><br>${esc(it.desc)}<br><span style="color:var(--dim)">다음 대결에서 자동 발동</span></span></div>`).join("")
     : '<div class="bi" style="color:var(--dim)">보관 중인 아이템 없음 · 상자를 열면 여기 들어옵니다</div>';
   if (m.tier) $("h-tier").textContent = m.tier.icon + " " + m.tier.name;
-  $("h-lv").textContent = "Lv." + (m.level || 1);
-  const span = Math.max(1, (m.xpNext || 60) - (m.xpBase || 0)); $("h-xp").style.width = Math.min(100, ((m.xp || 0) - (m.xpBase || 0)) / span * 100) + "%";
+  paintXp(m.level || 1, m.xp || 0, m.xpBase || 0, m.xpNext || 50);
+  const pk = $("perks"); const lvN = m.level || 1;
+  pk.innerHTML = `<div class="pk"><span class="lv">Lv1~</span><span><b>기본</b><br>레벨당 속도 +2% · 대결 시간 +0.3초 · 레벨업마다 +1점</span></div>` +
+    PERKS.map(k => `<div class="pk ${lvN >= k.lv ? (lvN === k.lv ? "now" : "") : "lock"}"><span class="lv">Lv${k.lv}</span><span>${k.icon} <b>${esc(k.name)}</b><br>${esc(k.desc)}</span></div>`).join("");
+  if (m.lvShield) { const d = document.createElement("div"); d.className = "bg on"; d.textContent = "🛡 레벨 방패 " + m.lvShield; $("badges").appendChild(d); }
   $("h-keys").textContent = m.keys ? "🔑×" + m.keys : "";
   $("golden").classList.toggle("on", !!m.golden);
   const ql = $("qlist"); ql.innerHTML = "";
@@ -881,6 +1009,7 @@ function frame(){
       const x = toX(P.x), y = toY(P.y);
       const teamCol = MODE !== "solo" && TEAMS[MT?.team] ? TEAMS[MT.team].color : "#FFC93C";
       drawBase(x, y, size, teamCol, (F.f & 256) ? .25 : .55);
+      levelAura(x, y, size, F.lv || 1, t);
       const idle = 0;
       cx.globalAlpha = (F.f & 1024) ? .35 : (F.f & 2) ? .5 : (F.f & 256) ? .6 : 1;
       if (moving && Math.random() < .2) parts.push({ x: x - P.face*6, y: y + size*.44, vx: -P.face*(.4+Math.random()*.6), vy: -.3-Math.random()*.5, life:.6, c:"#C7B58F", s:2.4 });
@@ -910,6 +1039,7 @@ function frame(){
     if (v.fl & 1024) cx.globalAlpha = .3;
     if (v.fl & 4096) drawGlow(x, y, size);
     drawBase(x, y, size, col, (v.fl & 256) ? .2 : .45);
+    levelAura(x, y, size, v.lv || 1, t);
     if (v.fl & 8) { cx.fillStyle = "rgba(255,71,87,.3)"; cx.beginPath(); cx.arc(x,y,size*.6+Math.sin(t/180)*2,0,7); cx.fill(); }
     if ((v.fl & 16) && Math.random() < .1) parts.push({ x: x - v.fc*5, y: y + size*.44, vx: -v.fc*(.3+Math.random()*.5), vy: -.25-Math.random()*.4, life:.55, c:"#C7B58F", s:2 });
     if (v.fl & 256) cx.globalAlpha = .45;
@@ -928,6 +1058,14 @@ function frame(){
     if (f2.life <= 0) { floats.splice(i, 1); continue; } cx.globalAlpha = Math.max(0, Math.min(1, f2.life*1.6));
     cx.fillStyle = "#0A0F1E"; cx.fillText(f2.txt, f2.x+2, f2.y+2); cx.fillStyle = f2.c; cx.fillText(f2.txt, f2.x, f2.y); }
   cx.globalAlpha = 1;
+  if (F.en && F.en[2] > 260 && !D) {                      // 상대 찾기 레이더
+    const a = Math.atan2(F.en[1], F.en[0]);
+    cx.save(); cx.translate(cxp, cyp); cx.rotate(a); cx.translate(80, 0);
+    cx.globalAlpha = .75; cx.fillStyle = "#FFC93C"; cx.beginPath(); cx.moveTo(16,0); cx.lineTo(0,-10); cx.lineTo(0,10); cx.closePath(); cx.fill();
+    cx.rotate(-a); cx.font = "700 11px " + getComputedStyle(document.body).getPropertyValue("--ui"); cx.textAlign = "center"; cx.textBaseline = "middle";
+    cx.fillStyle = "#0A0F1E"; cx.fillText("⚔ " + Math.round(F.en[2] / 40) + "칸", 1, 20); cx.fillStyle = "#FFC93C"; cx.fillText("⚔ " + Math.round(F.en[2] / 40) + "칸", 0, 19);
+    cx.globalAlpha = 1; cx.restore();
+  }
   if (aggroPos && Date.now() < aggroT) { const a = Math.atan2(aggroPos.y - P.y, aggroPos.x - P.x); cx.save(); cx.translate(cxp, cyp); cx.rotate(a); cx.translate(64, 0);
     cx.globalAlpha = .6 + .4*Math.sin(t/90); cx.fillStyle = aggroPos.c; cx.beginPath(); cx.moveTo(18,0); cx.lineTo(0,-13); cx.lineTo(0,13); cx.closePath(); cx.fill(); cx.globalAlpha = 1; cx.restore(); }
   cx.restore();
@@ -1012,9 +1150,14 @@ socket.on("pickup", (it) => { buzz([25,40]);
 socket.on("capture", (c) => { buzz([25,40]); SFX.play("capture"); spark(cv.clientWidth/2, cv.clientHeight/2, "#3DD68C", 24, 3); flash("radial-gradient(circle,rgba(61,214,140,.35),transparent 70%)"); floatText(cv.clientWidth/2, cv.clientHeight/2 - 60, `⛪ ${c.name} +1`, "#3DD68C"); });
 socket.on("treasure", () => { buzz([40,60,40,60,90]); SFX.play("treasure"); shake(420); flash("radial-gradient(circle,rgba(255,201,60,.6),transparent 72%)"); spark(cv.clientWidth/2, cv.clientHeight/2, "#FFC93C", 34, 3.4); toast("💎 숨겨진 보물 발견! +5", 3000); });
 socket.on("dodgeOk", () => { buzz([20,30,20]); SFX.play("dodge"); spark(cv.clientWidth/2, cv.clientHeight/2, "#FFFFFF", 16, 3.2); toast("↯ 3초 동안 무적!", 1600); });
-socket.on("xp", (x) => { floatText(cv.clientWidth/2 + 40, cv.clientHeight/2 - 30, `+${x.n} XP`, "#2ED3C6"); });
+socket.on("xp", (x) => { floatText(cv.clientWidth/2 + 40, cv.clientHeight/2 - 30, `+${x.n} XP`, "#2ED3C6");
+  if (x.level) paintXp(x.level, x.xp, x.base, x.next);
+  const g = $("xpgain"); g.textContent = `+${x.n} XP` + (x.why ? " · " + x.why : ""); g.classList.remove("on"); void g.offsetWidth; g.classList.add("on");
+  const bar = $("h-xp"); bar.classList.remove("flash"); void bar.offsetWidth; bar.classList.add("flash"); SFX.play("coin"); });
 socket.on("levelUp", (l) => { buzz([30,50,30,50,120]); SFX.play("fanfare"); flash("radial-gradient(circle,rgba(47,164,255,.55),transparent 70%)"); shake(300);
-  spark(cv.clientWidth/2, cv.clientHeight/2, "#2FA4FF", 44, 3.8); bigmsg("⬆", `레벨 ${l.level}!`, l.perk, 2800); });
+  spark(cv.clientWidth/2, cv.clientHeight/2, "#2FA4FF", 44, 3.8);
+  $("lvup-n").textContent = l.level; $("lvup-p").textContent = (l.bonus ? `+${l.bonus}점 · ` : "") + l.perk;
+  floatText(cv.clientWidth/2, cv.clientHeight/2 - 90, `+${l.bonus || 1}`, "#FFC93C"); const el = $("lvup"); el.classList.remove("on"); void el.offsetWidth; el.classList.add("on"); setTimeout(() => el.classList.remove("on"), 2600); });
 socket.on("needKey", (k) => { toast(`🔑 이 상자는 열쇠가 필요합니다 — 미니언(병사·여우·메뚜기)을 잡으면 열쇠를 얻습니다`, 2600); buzz(40); });
 socket.on("tierUp", (t) => { buzz([30,50,30,50,80]); SFX.play("fanfare"); flash("radial-gradient(circle,rgba(255,201,60,.6),transparent 70%)");
   spark(cv.clientWidth/2, cv.clientHeight/2, "#FFC93C", 40, 3.6); floatText(cv.clientWidth/2, cv.clientHeight/2 - 70, `${t.icon} ${t.name} 승급!`, "#FFC93C"); toast(`${t.icon} ${t.name} 으로 승급했습니다!`, 3000); });
@@ -1086,7 +1229,9 @@ socket.on("duel", (d) => {
     $("ring").style.setProperty("--p", p + "%"); $("ring-t").textContent = Math.ceil(left/1000); $("ring").classList.toggle("hot", p < 34);
     if (left <= 0) clearInterval(dtimer); }, 120);
 });
-socket.on("wrongPick", ({ choice }) => { buzz(160); SFX.play("wrong"); const b = $("dopts").children[choice]; if (b) { b.classList.remove("pickme"); b.classList.add("bad"); } $("dnote").textContent = "아쉽다! 상대도 못 맞히면 무승부"; });
+socket.on("wrongPick", ({ choice, forgiven }) => { buzz(160); SFX.play("wrong"); const b = $("dopts").children[choice]; if (b) { b.classList.remove("pickme"); b.classList.add("bad"); }
+  if (forgiven) { pick = null; [...$("dopts").children].forEach(c => { if (!c.classList.contains("bad") && !c.classList.contains("gone")) c.style.pointerEvents = ""; }); $("dnote").textContent = "🛡 레벨 방패! 오답 1회 면제 — 다시 고르세요"; bigmsg("🛡", "레벨 방패 발동", "오답 1회 면제 · 다시 고르세요", 1500); }
+  else $("dnote").textContent = "아쉽다! 상대도 못 맞히면 무승부"; });
 socket.on("duelEnd", (r) => {
   clearInterval(dtimer); D = null; $("duel").classList.remove("on"); $("pad").classList.remove("hide");
   if (r.kind === "minion" || r.kind === "chest") {
