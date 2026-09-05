@@ -31,9 +31,11 @@ app.get("/sprite.js", (req, res) => {
 
 /* ═════════ 설정 ═════════ */
 const TS = 40, R = 13;
-const SPEED = 92, MEET = 34;           // 천천히 걷는 속도 — 눈으로 따라가기 편하게
+const SPEED = 92, MEET = 40;           // 천천히 걷는 속도 — 눈으로 따라가기 편하게
 const TICK = 1000 / 20, SEND_HOST = 1000 / 12, SEND_PHONE = 1000 / 12, SEND_META = 550;
-const DUEL_TIME = 13, AFTER_DUEL = 4, REMATCH = 18, CELL = 120;
+const DUEL_TIME = 18, AFTER_DUEL = 4, REMATCH = 18, CELL = 120;
+/* 문제가 길면 읽을 시간을 더 줍니다: 글자 60자당 +1초 (최대 +10초) */
+const readTime = (q) => Math.min(10, Math.round((q.text.length + q.options.join("").length) / 60));
 const TIE_WINDOW = 400;                // 이 시간 안에 둘 다 맞히면 무승부
 const SCORE_FLOOR = -5;
 const DODGE_COOL = 40000, DODGE_TIME = 3200;
@@ -58,21 +60,21 @@ const TIER_TABLE = [
 ];
 const BOSSES = {                        // 보스전: 어려운 문제만 · 시간 짧음 · 틀리면 즉시 패배 · 지면 쓰러짐
   // 골리앗: 6초마다 돌진(3배속 1초). 정면으로 마주치면 못 피합니다
-  goliath:   { name: "골리앗",     speed: 50, reward: 3, penalty: 1, limit: 9,  trait: "돌진",   desc: "6초마다 무섭게 돌진합니다" },
+  goliath:   { name: "골리앗",     speed: 50, reward: 3, penalty: 1, limit: 14, trait: "돌진",   desc: "6초마다 무섭게 돌진합니다" },
   // 바로 왕: 거점(성전·제단·우물)을 순찰하며 지킵니다. 쓰러뜨리면 황금 상자를 떨어뜨립니다
-  pharaoh:   { name: "바로 왕",    speed: 42, reward: 4, penalty: 1, limit: 8,  trait: "거점 순찰", desc: "거점을 지키고, 죽으면 황금 상자를 남깁니다" },
+  pharaoh:   { name: "바로 왕",    speed: 42, reward: 4, penalty: 1, limit: 13, trait: "거점 순찰", desc: "거점을 지키고, 죽으면 황금 상자를 남깁니다" },
   // 바벨론 사자: 가장 빠르고 수풀에 숨습니다. 수풀 근처에선 조심
-  lion:      { name: "바벨론 사자", speed: 80, reward: 2, penalty: 1, limit: 7,  trait: "잠복",   desc: "수풀에 숨어 있다가 덮칩니다" },
+  lion:      { name: "바벨론 사자", speed: 80, reward: 2, penalty: 1, limit: 12, trait: "잠복",   desc: "수풀에 숨어 있다가 덮칩니다" },
   // 리워야단: 물 위를 다닙니다. 호수 근처가 위험. 후반에 한 번만
-  leviathan: { name: "리워야단",   speed: 44, reward: 6, penalty: 2, limit: 10, trait: "물길",   desc: "물 위를 헤엄쳐 다닙니다" },
+  leviathan: { name: "리워야단",   speed: 44, reward: 6, penalty: 2, limit: 15, trait: "물길",   desc: "물 위를 헤엄쳐 다닙니다" },
   // 느부갓네살: 보물상자를 찾아다니며 부숩니다
-  nebuchad:  { name: "느부갓네살", speed: 46, reward: 4, penalty: 1, limit: 8,  trait: "약탈",   desc: "보물상자를 찾아다니며 부숩니다" },
+  nebuchad:  { name: "느부갓네살", speed: 46, reward: 4, penalty: 1, limit: 13, trait: "약탈",   desc: "보물상자를 찾아다니며 부숩니다" },
   // 헤롯: 8초마다 아무 사람 옆으로 순간이동
-  herod:     { name: "헤롯 왕",    speed: 40, reward: 3, penalty: 1, limit: 8,  trait: "순간이동", desc: "8초마다 누군가의 옆으로 순간이동합니다" },
+  herod:     { name: "헤롯 왕",    speed: 40, reward: 3, penalty: 1, limit: 13, trait: "순간이동", desc: "8초마다 누군가의 옆으로 순간이동합니다" },
   // 에덴의 뱀: 지면 아이템을 모두 빼앗깁니다
-  serpent:   { name: "에덴의 뱀",  speed: 58, reward: 3, penalty: 1, limit: 8,  trait: "유혹",   desc: "지면 갖고 있던 아이템을 전부 빼앗깁니다" },
+  serpent:   { name: "에덴의 뱀",  speed: 58, reward: 3, penalty: 1, limit: 13, trait: "유혹",   desc: "지면 갖고 있던 아이템을 전부 빼앗깁니다" },
   // 아말렉 병사: 둘씩 무리로 등장
-  amalek:    { name: "아말렉 병사", speed: 68, reward: 1, penalty: 1, limit: 6,  trait: "무리",   desc: "둘씩 몰려다닙니다. 약하지만 빠릅니다" },
+  amalek:    { name: "아말렉 병사", speed: 68, reward: 1, penalty: 1, limit: 11, trait: "무리",   desc: "둘씩 몰려다닙니다. 약하지만 빠릅니다" },
 };
 const BOSS_RESPAWN_FAST = 20000;
 const DOWN_MS = 5000;                   // 보스에게 지면 쓰러져 있는 시간
@@ -86,19 +88,38 @@ const TIERS = [                         // 계급 (이번 판 점수 기준)
 ];
 const tierOf = (sc) => { let t = TIERS[0]; for (const x of TIERS) if (sc >= x.min) t = x; return t; };
 const tierIdx = (sc) => TIERS.indexOf(tierOf(sc));
-const XP_TABLE = [0, 60, 150, 270, 420, 600, 810, 1050, 1320, 1620];   // 레벨 1~10 누적 경험치
-const XP = { win: 40, draw: 10, boss: 80, soldier: 15, fox: 30, locust: 10, chest: 10, cap: 5, quest: 25, treasure: 40 };
+const XP_TABLE = [0, 50, 110, 180, 260, 350, 450, 560, 680, 810];    // 레벨 1~10 누적 경험치 (완만하게)
+const XP = { win: 45, draw: 12, boss: 90, soldier: 15, fox: 30, locust: 10, chest: 12, cap: 8, quest: 25, treasure: 45 };
 const levelOf = (xp) => { let l = 1; for (let i = 1; i < XP_TABLE.length; i++) if (xp >= XP_TABLE[i]) l = i + 1; return l; };
+/* 레벨별 해금 특성 — 레벨을 올릴 이유 */
+const PERKS = [
+  { lv: 2,  icon: "↯",  name: "빠른 회피",     desc: "회피 쿨다운 40초 → 30초" },
+  { lv: 3,  icon: "📦", name: "손빠른 손",     desc: "나무 상자 2.5초 → 1.2초에 열림" },
+  { lv: 4,  icon: "🔑", name: "행운의 손",     desc: "미니언 열쇠 확률 +20%" },
+  { lv: 5,  icon: "🎒", name: "넓은 가방",     desc: "아이템 보관 2칸 → 3칸 · 레벨업 +2점" },
+  { lv: 6,  icon: "⏳", name: "침착함",       desc: "모든 대결 시간 +3초" },
+  { lv: 7,  icon: "🛡", name: "레벨 방패",     desc: "보스전 첫 오답 1회 면제 · 패배 점수 보호 1회" },
+  { lv: 8,  icon: "🗡", name: "그림자 검",     desc: "기습 시 상대 잠금 1.5초 → 2.5초" },
+  { lv: 9,  icon: "✨", name: "빠른 부활",     desc: "쓰러진 시간 절반" },
+  { lv: 10, icon: "👑", name: "황금 오라",     desc: "승리마다 +1점 추가 · 황금 빛 · 레벨업 +3점" },
+];
+const hasPerk = (p, lv) => (p.level || 1) >= lv;
 function addXp(p, n, why) {
   p.xp = (p.xp || 0) + n;
   const lv = levelOf(p.xp);
   if (lv > (p.level || 1)) {
+    const from = p.level || 1;
     p.level = lv; p.glowUntil = now() + 3000;
-    pushLog(`⬆ ${p.name} 레벨 ${lv} 달성!`, "gold");
-    if (lv === 5 || lv === 10) bigEvent(`⬆ ${p.name} 레벨 ${lv}!`, "gold");
-    if (p.socketId) io.to(p.socketId).emit("levelUp", { level: lv, perk: lv >= 10 ? "최고 레벨! 속도 +20%" : `속도 +${(lv - 1) * 2}% · 대결 시간 +${((lv - 1) * .3).toFixed(1)}초` });
+    if (lv >= 7 && from < 7) p.lvShield = 1;                     // 레벨 방패 충전
+    const bonus = lv >= 10 ? 3 : lv >= 5 ? 2 : 1;               // 레벨업 즉시 점수
+    addScore(p, bonus);
+    const perk = PERKS.find((k) => k.lv === lv);
+    pushLog(`⬆ ${p.name} 레벨 ${lv} 달성! +${bonus}점` + (perk ? ` · ${perk.icon} ${perk.name}` : ""), "gold");
+    if (lv >= 4) bigEvent(`⬆ ${p.name} 레벨 ${lv}!`, lv >= 8 ? "gold" : "win");
+    if (p.socketId) io.to(p.socketId).emit("levelUp", { level: lv, bonus,
+      perk: perk ? `${perk.icon} ${perk.name} — ${perk.desc}` : `속도 +${(lv - 1) * 2}% · 대결 시간 +${((lv - 1) * .3).toFixed(1)}초` });
   }
-  if (p.socketId && n >= 10) io.to(p.socketId).emit("xp", { n, why });
+  if (p.socketId && n >= 5) io.to(p.socketId).emit("xp", { n, why, xp: p.xp, level: lv, next: XP_TABLE[Math.min(9, lv)] || XP_TABLE[9], base: XP_TABLE[lv - 1] });
 }
 const QUESTS = [                        // 도전과제
   { id: "win1",   name: "첫 승리",        need: 1, bonus: 1, desc: "대결에서 1승" },
@@ -349,7 +370,7 @@ function startDuel(a, b, ambush) {
   const q = pickQuestion(a, b, region);
   if (!q) return;
   const id = G.nextDuelId++;
-  let limit = DUEL_TIME + Math.round(Math.max((a.level || 1), (b.level || 1)) - 1) * .3;
+  let limit = DUEL_TIME + readTime(q) + Math.round(Math.max((a.level || 1), (b.level || 1)) - 1) * .3 + ((hasPerk(a, 6) || hasPerk(b, 6)) ? 3 : 0);
   if (a.cls === "scroll" || b.cls === "scroll") limit += 4;
   if (a.items.includes("time") || b.items.includes("time")) limit += 6;
   if (isUnderdog(a) || isUnderdog(b)) limit += 2;
@@ -360,7 +381,7 @@ function startDuel(a, b, ambush) {
     hint: { [a.id]: wantHint(a), [b.id]: wantHint(b) },
     bonus: { [a.id]: take(a, "double"), [b.id]: take(b, "double") },
     shield: { [a.id]: take(a, "shield"), [b.id]: take(b, "shield") }, used,
-    ambush: ambush ? a.id : null, lock: ambush ? { [b.id]: now() + AMBUSH_LOCK } : {} };
+    ambush: ambush ? a.id : null, lock: ambush ? { [b.id]: now() + (hasPerk(a, 8) ? 2500 : AMBUSH_LOCK) } : {} };
   if (a.items.includes("time") || b.items.includes("time")) { take(a, "time"); take(b, "time"); }
   if (ambush) { a.ghostUntil = 0; a.ambushes = (a.ambushes || 0) + 1; }
   a.duel = id; b.duel = id; a.duelCount++; b.duelCount++;
@@ -374,7 +395,7 @@ function startBossDuel(p, boss) {
   if (!q) return;
   const B = BOSSES[boss.type];
   const id = G.nextDuelId++;
-  const limit = B.limit + (p.cls === "scroll" ? 4 : 0);
+  const limit = B.limit + readTime(q) + (p.cls === "scroll" ? 4 : 0) + (hasPerk(p, 6) ? 3 : 0);
   const d = { id, a: p.id, b: null, q, limit, region: regionOf(p.y, p.x), endsAt: now() + limit * 1000,
               picks: {}, boss: boss.type, bossId: boss.id,
               hint: { [p.id]: false }, bonus: {}, shield: {} };       // 보스전엔 힌트 없음
@@ -439,7 +460,7 @@ function resolveDuel(d) {
       const m = G.minions.find((x) => x.id === d.minionId), M = MINIONS[d.minion];
       if (ok) {
         p.minionKills++; addXp(p, M.xp, M.name + " 처치");
-        let key = false; if (Math.random() < M.key) { p.keys++; key = true; }
+        let key = false; if (Math.random() < M.key + (hasPerk(p, 4) ? .2 : 0)) { p.keys++; key = true; }
         if (m) { m.dead = true; m.respawnAt = t + 15000; }
         if (p.socketId) io.to(p.socketId).emit("duelEnd", { ...res, result: "win", gain: 0, kind: "minion", xp: M.xp, key, minion: d.minion });
       } else {
@@ -466,7 +487,7 @@ function resolveDuel(d) {
       const gain = B.reward * scoreMult(t);
       addScore(p, gain); p.wins++; p.streak++; p.bestStreak = Math.max(p.bestStreak, p.streak); p.bossKills++;
       quest(p, "boss1"); quest(p, "win1"); if (p.streak >= 3) quest(p, "streak3", 3);
-      addXp(p, XP.boss, B.name + " 격파");
+      addXp(p, Math.round(XP.boss * ((p.level || 1) <= 3 ? 1.5 : 1)), B.name + " 격파" + ((p.level || 1) <= 3 ? " (저레벨 보너스)" : ""));
       p.emote = 1 + (Math.random() * EMOTES.length | 0); p.emoteUntil = t + 2800;
       pushLog(`🏅 ${p.name} 이(가) ${B.name}을 이겼습니다! +${gain}점`, "gold");
       bigEvent(`🏅 ${p.name} ${B.name} 격파! +${gain}`, "gold");
@@ -479,7 +500,7 @@ function resolveDuel(d) {
       addScore(p, -B.penalty); p.losses++; p.streak = 0;
       noteWrong(p, d, pk ? pk.choice : -1);
       if (d.boss === "serpent" && p.items.length) { pushLog(`🐍 ${p.name} 이(가) 에덴의 뱀에게 아이템 ${p.items.length}개를 빼앗겼습니다`, "draw"); p.items = []; }
-      p.downUntil = t + DOWN_MS;                           // 쓰러짐 → 5초 뒤 다른 곳에서 부활
+      p.downUntil = t + (hasPerk(p, 9) ? DOWN_MS / 2 : DOWN_MS);   // 쓰러짐 → 5초(Lv9: 2.5초) 뒤 부활
       pushLog(`${p.name} 이(가) ${B.name}에게 쓰러졌습니다`, "draw");
       showReveal(B.name);
       if (p.socketId) io.to(p.socketId).emit("duelEnd", { ...res, result: "lose", gain: -B.penalty, boss: d.boss, down: DOWN_MS / 1000 });
@@ -520,6 +541,7 @@ function resolveDuel(d) {
     if (G.leaderId === loser.id) { gain += 2; tags.push("👑 1위 사냥"); }
     if (winner.lostTo.has(loser.id)) { gain++; tags.push("설욕!"); winner.lostTo.delete(loser.id); }
     if (d.ambush === winner.id) { gain++; tags.push("🗡 기습 성공"); winner.ambushWins = (winner.ambushWins || 0) + 1; }
+    if (hasPerk(winner, 10)) { gain++; tags.push("👑 황금 오라"); }
     const ns = winner.streak + 1;
     if (ns >= 5) gain += 2; else if (ns >= 3) gain += 1;
     gain *= scoreMult(t); if (scoreMult(t) > 1) tags.push("⚡ 2배");
@@ -527,10 +549,15 @@ function resolveDuel(d) {
     addScore(winner, gain); winner.wins++; winner.streak = ns;
     winner.bestStreak = Math.max(winner.bestStreak, ns);
     quest(winner, "win1"); if (ns >= 3) quest(winner, "streak3", 3);
-    addXp(winner, XP.win, "대결 승리"); addXp(loser, 5, "");
+    { const diff = (loser.level || 1) - (winner.level || 1);
+      const mul = diff > 0 ? Math.min(3, 1 + diff * .5) : 1;      // 낮은 레벨이 높은 레벨을 이기면 최대 3배
+      addXp(winner, Math.round(XP.win * mul), diff > 0 ? `하극상! Lv${loser.level} 격파 ×${mul.toFixed(1)}` : "대결 승리");
+      if (diff > 0) tags.push(`🐣 하극상 ×${mul.toFixed(1)} XP`);
+      addXp(loser, 5 + Math.max(0, -diff) * 3, ""); }               // 높은 레벨에게 진 쪽도 조금
     let lost = 1;
     if (d.shield[loser.id]) lost = 0;
     else if (loser.cls === "shield" && loser.guard > 0) { lost = 0; loser.guard--; }
+    else if ((loser.lvShield || 0) > 0) { lost = 0; loser.lvShield--; }
     if (loser.score <= SCORE_FLOOR) lost = 0;
     addScore(loser, -lost); loser.losses++; loser.streak = 0;
     const pk = d.picks[loser.id];
@@ -542,9 +569,9 @@ function resolveDuel(d) {
     showReveal(winner.name);
     winner.emote = 1 + (Math.random() * EMOTES.length | 0); winner.emoteUntil = t + 2800;
     const sticker = STICKERS[Math.random() * STICKERS.length | 0];
-    loser.downUntil = t + DOWN_DUEL_MS;                       // 진 쪽은 쓰러졌다가 다른 곳에서 부활
+    loser.downUntil = t + (hasPerk(loser, 9) ? DOWN_DUEL_MS / 2 : DOWN_DUEL_MS);   // 진 쪽은 쓰러졌다가 부활
     if (winner.socketId) io.to(winner.socketId).emit("duelEnd", { ...res, result: "win", gain, streak: ns, tags, sticker, card: giveCard(winner, d.q) });
-    if (loser.socketId) io.to(loser.socketId).emit("duelEnd", { ...res, result: "lose", gain: -lost, saved: lost === 0, down: DOWN_DUEL_MS / 1000 });
+    if (loser.socketId) io.to(loser.socketId).emit("duelEnd", { ...res, result: "lose", gain: -lost, saved: lost === 0, down: (hasPerk(loser, 9) ? DOWN_DUEL_MS / 2 : DOWN_DUEL_MS) / 1000 });
   }
 
   [a, b].forEach((p) => { p.duel = null; p.safeUntil = t + AFTER_DUEL * 1000; });
@@ -605,6 +632,20 @@ function applyMove(p, x, y, dt, t) {
 const hidden = (p) => tileAt(p.x, p.y) === 5;
 /* 은신 = 수풀 잠복 또는 구름 기둥. 은신 중엔 대결이 자동으로 안 붙고, 기습 버튼으로만 걸 수 있습니다 */
 const stealth = (p, t) => hidden(p) || t < p.ghostUntil;
+/* 레이더: 가장 가까운 '싸울 수 있는' 상대 방향 (은신·쓰러짐·대결 중·같은 팀 제외). [dx, dy, 거리] */
+function nearestEnemy(p, t) {
+  if (p.duel || t < p.downUntil) return null;
+  let best = null, bd = 1e9;
+  for (const o of G.players.values()) {
+    if (o === p || !o.connected || o.duel || t < o.downUntil || stealth(o, t)) continue;
+    if (teamCount() && o.team === p.team) continue;
+    if ((p.recent.get(o.id) || 0) > t) continue;
+    const d = Math.hypot(o.x - p.x, o.y - p.y);
+    if (d < bd) { bd = d; best = o; }
+  }
+  if (!best) return null;
+  return [Math.round((best.x - p.x) / bd * 100) / 100, Math.round((best.y - p.y) / bd * 100) / 100, bd | 0];
+}
 function ambushTarget(p, t) {
   if (!stealth(p, t) || p.duel || t < p.downUntil) return null;
   let best = null, bd = 90;
@@ -636,7 +677,7 @@ function step(dt, t) {
       if ((p.boxLock[b.id] || 0) > t) { /* 자물쇠 퀴즈 실패 후 잠금 */ }
       else if (b.tier === 0) {                          // 나무 상자: 2.5초 동안 서 있기
         if (p.chestId !== b.id) { p.chestId = b.id; p.chestT = t; }
-        else if (!p.moving && t - p.chestT >= 2500) openBox(p, b);
+        else if (!p.moving && t - p.chestT >= (hasPerk(p, 3) ? 1200 : 2500)) openBox(p, b);
         else if (p.moving) p.chestT = t;
       } else if (b.tier === 1) {                        // 금테 상자: 자물쇠 퀴즈
         if (!b.busy) startChestDuel(p, b);
@@ -674,10 +715,7 @@ function step(dt, t) {
   }
   for (const p of ready) {
     if (p.duel) continue;
-    const hitBoss = G.bosses.find((b) => !b.dead && t >= b.busyUntil && Math.hypot(p.x - b.x, p.y - b.y) < 44);
-    if (hitBoss) { startBossDuel(p, hitBoss); continue; }
-    const hitMin = G.minions.find((m) => !m.dead && t >= m.busyUntil && Math.hypot(p.x - m.x, p.y - m.y) < 34);
-    if (hitMin) { startMinionDuel(p, hitMin); continue; }
+    // ① 사람끼리 (가장 우선)
     const cx = (p.x / CELL) | 0, cy = (p.y / CELL) | 0;
     for (let gx = cx - 1; gx <= cx + 1 && !p.duel; gx++)
       for (let gy = cy - 1; gy <= cy + 1 && !p.duel; gy++) {
@@ -691,6 +729,15 @@ function step(dt, t) {
           startDuel(p, o); break;
         }
       }
+    if (p.duel) continue;
+    // ② 보스
+    const hitBoss = G.bosses.find((b) => !b.dead && t >= b.busyUntil && Math.hypot(p.x - b.x, p.y - b.y) < 44);
+    if (hitBoss) { startBossDuel(p, hitBoss); continue; }
+    // ③ 미니언 (직전 미니언 대결 후 8초는 통과)
+    if (t >= (p.minionCool || 0)) {
+      const hitMin = G.minions.find((m) => !m.dead && t >= m.busyUntil && Math.hypot(p.x - m.x, p.y - m.y) < 26);
+      if (hitMin) { startMinionDuel(p, hitMin); continue; }
+    }
   }
   for (const d of [...G.duels.values()]) if (t >= d.endsAt) resolveDuel(d);
   autoFeature(t);
@@ -750,11 +797,11 @@ function farSpot(minD) {
 }
 /* ── 미니언: 부딪히면 쉬운 문제, 맞히면 경험치(+열쇠 확률). 지면 아무 손해 없음 ── */
 const MINIONS = {
-  soldier: { name: "블레셋 병사", speed: 38, xp: 15, key: .3,  limit: 6, mode: "patrol" },
-  fox:     { name: "광야 여우",   speed: 92, xp: 30, key: .5,  limit: 6, mode: "flee" },
-  locust:  { name: "메뚜기 떼",   speed: 55, xp: 10, key: .15, limit: 5, mode: "swarm" },
+  soldier: { name: "블레셋 병사", speed: 38, xp: 15, key: .3,  limit: 12, mode: "patrol" },
+  fox:     { name: "광야 여우",   speed: 92, xp: 30, key: .5,  limit: 12, mode: "flee" },
+  locust:  { name: "메뚜기 떼",   speed: 55, xp: 10, key: .15, limit: 11, mode: "swarm" },
 };
-const minionTarget = () => Math.min(48, 10 + Math.round(G.players.size * .55));
+const minionTarget = () => Math.min(30, 8 + Math.round(G.players.size * .35));   // 60명이면 29마리
 function spawnMinion(type) {
   const s = farSpot(200);
   const m = { id: G.nextMinionId++, type, x: s.x, y: s.y, tx: s.x, ty: s.y, face: 1, walk: 0, dead: false, busyUntil: 0 };
@@ -793,16 +840,18 @@ function startMinionDuel(p, m) {
   const q = pickQuestion(p, null, regionOf(p.y, p.x), false, true);
   if (!q) return;
   const id = G.nextDuelId++;
-  const d = { id, a: p.id, b: null, q, limit: M.limit, region: regionOf(p.y, p.x), endsAt: now() + M.limit * 1000, picks: {},
+  const limit = M.limit + readTime(q);
+  const d = { id, a: p.id, b: null, q, limit, region: regionOf(p.y, p.x), endsAt: now() + limit * 1000, picks: {},
               boss: false, kind: "minion", minion: m.type, minionId: m.id, hint: {}, bonus: {}, shield: {}, used: {}, lock: {} };
-  p.duel = id; m.busyUntil = now() + M.limit * 1000 + 300;
+  p.duel = id; m.busyUntil = now() + limit * 1000 + 300; p.minionCool = now() + limit * 1000 + 8000;   // 끝난 뒤 8초는 미니언과 안 붙음
   G.duels.set(id, d); sendDuel(p, d);
 }
 function startChestDuel(p, b) {
   const q = pickQuestion(p, null, regionOf(p.y, p.x), false, true);
   if (!q) return;
   const id = G.nextDuelId++;
-  const d = { id, a: p.id, b: null, q, limit: 7, region: regionOf(p.y, p.x), endsAt: now() + 7000, picks: {},
+  const limit = 12 + readTime(q);
+  const d = { id, a: p.id, b: null, q, limit, region: regionOf(p.y, p.x), endsAt: now() + limit * 1000, picks: {},
               boss: false, kind: "chest", boxId: b.id, hint: {}, bonus: {}, shield: {}, used: {}, lock: {} };
   p.duel = id; b.busy = true; p.chestId = 0;
   G.duels.set(id, d); sendDuel(p, d);
@@ -1032,8 +1081,9 @@ setInterval(() => {
       cd: G.phase === "countdown" ? Math.max(0, Math.ceil((G.countdownEnd - t) / 1000)) : 0,
       n, bosses: bn, mn, tr: trn, seq: rosterSeq, mapSeq: MAP.seq,
       amb: ambushTarget(p, t) ? 1 : 0,
+      en: nearestEnemy(p, t),
       lv: p.level || 1, zn: zoneOf(p.x, p.y),
-      ch: p.chestId ? Math.min(1, (t - p.chestT) / 2500) : 0,
+      ch: p.chestId ? Math.min(1, (t - p.chestT) / (hasPerk(p, 3) ? 1200 : 2500)) : 0,
       dodge: Math.max(0, Math.ceil((p.dodgeReady - t) / 1000)),
     });
   }
@@ -1059,7 +1109,7 @@ setInterval(() => {
       tier: tierOf(p.score), golden: golden(now()),
       buffs: { speed: Math.max(0, Math.ceil((p.speedUntil - now()) / 1000)), ghost: Math.max(0, Math.ceil((p.ghostUntil - now()) / 1000)) },
       xp: p.xp || 0, level: p.level || 1, xpNext: XP_TABLE[Math.min(XP_TABLE.length - 1, p.level || 1)] || XP_TABLE[9], xpBase: XP_TABLE[(p.level || 1) - 1],
-      keys: p.keys || 0, minionKills: p.minionKills || 0,
+      keys: p.keys || 0, minionKills: p.minionKills || 0, lvShield: p.lvShield || 0,
       quests: QUESTS.map((q) => ({ id: q.id, name: q.name, desc: q.desc, bonus: q.bonus, need: q.need, have: Math.min(q.need, p.q[q.id] || 0), done: !!p.qDone[q.id] })),
       down: Math.max(0, Math.ceil((p.downUntil - now()) / 1000)),
     });
@@ -1098,6 +1148,7 @@ function beginPlay() {
   let count = 0;
   for (let i = 0; count < want; i++) { const tp = order[i % order.length]; spawnBoss(tp); count++; if (tp === "amalek" && count < want) { spawnBoss("amalek"); count++; } }
   G.treasure = null; G.nextTreasure = now() + TREASURE_FIRST;
+  for (const p of G.players.values()) if (p.practiceXp) { addXp(p, p.practiceXp, "연습 퀴즈 출발 보너스"); p.practiceXp = 0; p.practiceCorrect = 0; }
   pushLog("게임 시작! 돌아다니다 만나면 대결이 시작됩니다", "hot");
   bigEvent("게임 시작!", "gold");
 }
@@ -1212,7 +1263,7 @@ app.get("/api/join-info", async (q, r) => {
   const asked = typeof q.query.u === "string" ? q.query.u.trim() : "";
   const url = /^https?:\/\/[A-Za-z0-9.\-_:\[\]]+$/.test(asked) && !/localhost|127\.0\.0\.1/.test(asked) ? asked : JOIN_URL;
   const qr = await QRCode.toDataURL(url, { margin: 1, width: 620, color: { dark: "#141021", light: "#FFFFFF" } });
-  r.json({ url, qr, lan: JOIN_URL, zones: ZONES, minions: Object.fromEntries(Object.entries(MINIONS).map(([k, v]) => [k, { name: v.name, xp: v.xp, key: v.key }])), xpTable: XP_TABLE, items: BOX_ITEMS, teams: TEAMS, qproblems: G.qproblems, emotes: EMOTES, tiers: TIERS, bosses: Object.fromEntries(Object.entries(BOSSES).map(([k, v]) => [k, { name: v.name, reward: v.reward, penalty: v.penalty, trait: v.trait, desc: v.desc }])) });
+  r.json({ url, qr, lan: JOIN_URL, zones: ZONES, perks: PERKS, minions: Object.fromEntries(Object.entries(MINIONS).map(([k, v]) => [k, { name: v.name, xp: v.xp, key: v.key }])), xpTable: XP_TABLE, items: BOX_ITEMS, teams: TEAMS, qproblems: G.qproblems, emotes: EMOTES, tiers: TIERS, bosses: Object.fromEntries(Object.entries(BOSSES).map(([k, v]) => [k, { name: v.name, reward: v.reward, penalty: v.penalty, trait: v.trait, desc: v.desc }])) });
 });
 app.get("/api/map", (q, r) => { NOCACHE(r); r.json({ TS, TW: MAP.TW, TH: MAP.TH, W: MAP.W, H: MAP.H, seq: MAP.seq,
   tiles: Buffer.from(MAP.t).toString("base64") }); });
@@ -1366,10 +1417,28 @@ io.on("connection", (socket) => {
     if (!target) return;
     startDuel(p, target, true);
   });
+  /* 대기실 연습 퀴즈 — 점수 없음, 3문제 맞히면 출발 보너스 XP */
+  socket.on("practice:get", () => {
+    const p = G.players.get(socket.data.pid);
+    if (!p || G.phase !== "lobby" || !G.questions.length) return;
+    const pool = G.questions.filter((q) => !q.hard);
+    const q0 = (pool.length ? pool : G.questions)[Math.random() * (pool.length || G.questions.length) | 0];
+    const order = [0, 1, 2, 3].sort(() => Math.random() - .5);
+    p.practiceQ = { id: q0.id, options: order.map((i) => q0.options[i]), answer: order.indexOf(q0.answer), ref: q0.ref, exp: q0.exp };
+    socket.emit("practice:q", { text: q0.text, options: p.practiceQ.options, cat: q0.cat, done: p.practiceCorrect || 0 });
+  });
+  socket.on("practice:answer", (o) => {
+    const p = G.players.get(socket.data.pid);
+    if (!p || !p.practiceQ) return;
+    const q = p.practiceQ; p.practiceQ = null;
+    const ok = (+o.choice) === q.answer;
+    if (ok && (p.practiceCorrect || 0) < 3) { p.practiceCorrect = (p.practiceCorrect || 0) + 1; p.practiceXp = (p.practiceXp || 0) + 10; }
+    socket.emit("practice:r", { ok, answer: q.answer, ref: q.ref, exp: q.exp, done: p.practiceCorrect || 0, bonus: p.practiceXp || 0 });
+  });
   socket.on("dodge", () => {
     const p = G.players.get(socket.data.pid), t = now();
     if (!p || p.duel || G.phase !== "playing" || t < p.dodgeReady) return;
-    p.dodgeUntil = t + DODGE_TIME; p.dodgeReady = t + DODGE_COOL;
+    p.dodgeUntil = t + DODGE_TIME; p.dodgeReady = t + (hasPerk(p, 2) ? 30000 : DODGE_COOL);
     io.to(p.socketId).emit("dodgeOk");
   });
   socket.on("answer", (o) => {
@@ -1392,7 +1461,11 @@ io.on("connection", (socket) => {
       }
       return;
     }
-    if (d.boss) return resolveDuel(d);                   // 보스전: 틀리면 그 자리에서 패배
+    if (d.boss) {                                          // 보스전: 틀리면 그 자리에서 패배 (Lv7 레벨 방패는 1회 면제)
+      if (hasPerk(p, 7) && !d.forgiven) { d.forgiven = true; delete d.picks[p.id];
+        if (p.socketId) io.to(p.socketId).emit("wrongPick", { choice: c, forgiven: true }); return; }
+      return resolveDuel(d);
+    }
     if (d.picks[foe]) return resolveDuel(d);
     if (p.socketId) io.to(p.socketId).emit("wrongPick", { choice: c });
   });
