@@ -105,6 +105,7 @@ const PERKS = [
 ];
 const hasPerk = (p, lv) => (p.level || 1) >= lv;
 function addXp(p, n, why) {
+  if (now() < (p.catchUpUntil || 0)) { n = Math.round(n * 2); why = why ? why + " ×2" : why; }   // 지각 입장 따라잡기
   p.xp = (p.xp || 0) + n;
   const lv = levelOf(p.xp);
   if (lv > (p.level || 1)) {
@@ -735,7 +736,7 @@ function step(dt, t) {
     if (hitBoss) { startBossDuel(p, hitBoss); continue; }
     // ③ 미니언 (직전 미니언 대결 후 8초는 통과)
     if (t >= (p.minionCool || 0)) {
-      const hitMin = G.minions.find((m) => !m.dead && t >= m.busyUntil && Math.hypot(p.x - m.x, p.y - m.y) < 26);
+      const hitMin = G.minions.find((m) => !m.dead && t >= m.busyUntil && Math.hypot(p.x - m.x, p.y - m.y) < 32);
       if (hitMin) { startMinionDuel(p, hitMin); continue; }
     }
   }
@@ -784,6 +785,22 @@ function nearestBush(b) {
   }
   return best;
 }
+/* 사람들이 모인 쪽 가까이, 그러나 아무에게도 너무 붙지 않는 자리 (지각 입장용) */
+function joinSpot() {
+  const others = [...G.players.values()].filter((x) => x.connected && !x.duel);
+  if (!others.length) return freeSpot();
+  let best = null, bestScore = -1e9;
+  for (let i = 0; i < 24; i++) {
+    const c = freeSpot();
+    let near = 1e9, avg = 0;
+    for (const o of others) { const d = Math.hypot(o.x - c.x, o.y - c.y); near = Math.min(near, d); avg += d; }
+    avg /= others.length;
+    if (near < 220) continue;                        // 남의 코앞은 제외
+    const sc = -avg + Math.min(near, 600) * .3;      // 평균적으로 가까운 곳을 선호
+    if (sc > bestScore) { bestScore = sc; best = c; }
+  }
+  return best || freeSpot();
+}
 function farSpot(minD) {
   let best = null, bd = -1;
   for (let i = 0; i < 20; i++) {
@@ -801,7 +818,7 @@ const MINIONS = {
   fox:     { name: "광야 여우",   speed: 92, xp: 30, key: .5,  limit: 12, mode: "flee" },
   locust:  { name: "메뚜기 떼",   speed: 55, xp: 10, key: .15, limit: 11, mode: "swarm" },
 };
-const minionTarget = () => Math.min(30, 8 + Math.round(G.players.size * .35));   // 60명이면 29마리
+const minionTarget = () => Math.min(40, 12 + Math.round(G.players.size * .45));   // 60명이면 39마리
 function spawnMinion(type) {
   const s = farSpot(200);
   const m = { id: G.nextMinionId++, type, x: s.x, y: s.y, tx: s.x, ty: s.y, face: 1, walk: 0, dead: false, busyUntil: 0 };
@@ -824,6 +841,8 @@ function updateMinions(dt, t) {
     let near = null, nd = 1e9;
     for (const p of G.players.values()) { if (!p.connected || p.duel || t < p.downUntil) continue; const d = Math.hypot(p.x - m.x, p.y - m.y); if (d < nd) { nd = d; near = p; } }
     if (M.mode === "flee" && near && nd < 220) { m.tx = m.x + (m.x - near.x) / nd * 200; m.ty = m.y + (m.y - near.y) / nd * 200; sp *= 1.15; }
+    // 병사·메뚜기는 가까운 사람에게 천천히 다가옵니다 (넓은 맵에서 만날 수 있게)
+    else if (M.mode !== "flee" && near && nd < (M.mode === "patrol" ? 340 : 240)) { m.tx = near.x; m.ty = near.y; }
     else if (Math.hypot(m.tx - m.x, m.ty - m.y) < 12 || t > (m.retarget || 0)) {
       m.retarget = t + 2500 + Math.random() * 3000;
       const rr = M.mode === "swarm" ? 90 : 220;
@@ -843,7 +862,7 @@ function startMinionDuel(p, m) {
   const limit = M.limit + readTime(q);
   const d = { id, a: p.id, b: null, q, limit, region: regionOf(p.y, p.x), endsAt: now() + limit * 1000, picks: {},
               boss: false, kind: "minion", minion: m.type, minionId: m.id, hint: {}, bonus: {}, shield: {}, used: {}, lock: {} };
-  p.duel = id; m.busyUntil = now() + limit * 1000 + 300; p.minionCool = now() + limit * 1000 + 8000;   // 끝난 뒤 8초는 미니언과 안 붙음
+  p.duel = id; m.busyUntil = now() + limit * 1000 + 300; p.minionCool = now() + limit * 1000 + 5000;   // 끝난 뒤 5초는 미니언과 안 붙음
   G.duels.set(id, d); sendDuel(p, d);
 }
 function startChestDuel(p, b) {
@@ -1110,6 +1129,7 @@ setInterval(() => {
       buffs: { speed: Math.max(0, Math.ceil((p.speedUntil - now()) / 1000)), ghost: Math.max(0, Math.ceil((p.ghostUntil - now()) / 1000)) },
       xp: p.xp || 0, level: p.level || 1, xpNext: XP_TABLE[Math.min(XP_TABLE.length - 1, p.level || 1)] || XP_TABLE[9], xpBase: XP_TABLE[(p.level || 1) - 1],
       keys: p.keys || 0, minionKills: p.minionKills || 0, lvShield: p.lvShield || 0,
+      boost: Math.max(0, Math.ceil(((p.catchUpUntil || 0) - now()) / 1000)),
       quests: QUESTS.map((q) => ({ id: q.id, name: q.name, desc: q.desc, bonus: q.bonus, need: q.need, have: Math.min(q.need, p.q[q.id] || 0), done: !!p.qDone[q.id] })),
       down: Math.max(0, Math.ceil((p.downUntil - now()) / 1000)),
     });
@@ -1131,6 +1151,7 @@ function startGame(min) {
       wins: 0, losses: 0, draws: 0, boxCount: 0, distance: 0, capPoints: 0,
       guard: p.cls === "shield" ? 2 : 0, speedUntil: 0, ghostUntil: 0, dodgeUntil: 0, dodgeReady: 0,
       safeUntil: now() + 5000, downUntil: 0, tier: 0, duelCount: 0, bossKills: 0, xp: 0, level: 1, keys: 0, minionKills: 0, chestT: 0, chestId: 0, boxLock: {},
+      catchUpUntil: 0, lateJoin: false, lvShield: 0,
       q: { win1: 0, duel5: 0, streak3: 0, boss1: 0, box5: 0, cap3: 0 }, qDone: {} });
     p.recent.clear(); p.lostTo.clear();
   }
@@ -1334,6 +1355,7 @@ io.on("connection", (socket) => {
       Object.assign(p, { score: 0, wins: 0, losses: 0, draws: 0, streak: 0, bestStreak: 0, items: [],
         duel: null, speedUntil: 0, ghostUntil: 0, dodgeUntil: 0, dodgeReady: 0,
         boxCount: 0, distance: 0, capPoints: 0, guard: p.cls === "shield" ? 2 : 0, wrong: [], downUntil: 0, tier: 0, xp: 0, level: 1, keys: 0, minionKills: 0, boxLock: {},
+        catchUpUntil: 0, lateJoin: false, lvShield: 0,
         q: { win1: 0, duel5: 0, streak3: 0, boss1: 0, box5: 0, cap3: 0 }, qDone: {} });
       p.seen.clear(); p.recent.clear(); p.lostTo.clear();
     }
@@ -1373,9 +1395,26 @@ io.on("connection", (socket) => {
         for (const o2 of G.players.values()) cnt[o2.team]++;
         p.team = cnt.indexOf(Math.min(...cnt));
       }
-      if (G.phase === "playing") p.safeUntil = now() + 6000;
+      if (G.phase === "playing" || G.phase === "paused") {
+        // ── 지각 입장 따라잡기 ──
+        const lvs = [...G.players.values()].filter((x) => x.connected).map((x) => x.level || 1).sort((a, b) => a - b);
+        const med = lvs.length ? lvs[lvs.length >> 1] : 1;
+        const startLv = Math.max(1, Math.min(7, med - 1));
+        p.level = startLv; p.xp = XP_TABLE[startLv - 1] || 0;
+        if (startLv >= 7) p.lvShield = 1;
+        p.safeUntil = now() + 10000;                   // 10초 무적 (둘러볼 시간)
+        p.catchUpUntil = now() + 120000;               // 2분 동안 경험치 2배
+        p.keys = 1;                                    // 열쇠 하나
+        p.items = [["speed", "shield", "hint", "time", "double"][Math.random() * 5 | 0]];
+        const sp = joinSpot(); p.x = sp.x; p.y = sp.y;
+        p.lateJoin = true;
+        pushLog(`${c.name} 지각 입장! Lv${startLv} 지원 · 2분간 경험치 2배`, "hot");
+        setTimeout(() => { if (p.socketId) io.to(p.socketId).emit("lateJoin", {
+          level: startLv, keys: 1, item: BOX_ITEMS[p.items[0]], boost: 120, safe: 10,
+          left: leftSec(), top: [...G.players.values()].sort((a, b) => b.score - a.score)[0]?.score || 0 }); }, 400);
+      }
       G.players.set(p.id, p);
-      pushLog(`${c.name} 참가!`);
+      if (!p.lateJoin) pushLog(`${c.name} 참가!`);
       changed = true;
     } else if (G.phase === "lobby") {
       p.name = c.name; p.look = L; p.cls = ITEM_CLASS[L.it];
