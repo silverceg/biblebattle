@@ -29,8 +29,8 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .logo{font-size:22px;color:var(--gold);text-shadow:2px 2px 0 var(--deep)}
 .clock{font-size:26px;text-shadow:2px 2px 0 var(--deep);background:rgba(0,0,0,.35);padding:2px 14px;border-radius:12px;border:2px solid var(--deep)}
 .clock.warn{color:var(--red)}
-.st{font-size:11px;color:var(--dim)}
-.st b{font-size:17px;color:var(--cream);font-weight:400}
+.st{font-size:12px;color:var(--dim);font-weight:700}
+.st b{font-size:22px;color:var(--cream);font-weight:400}
 .grow{margin-left:auto}
 .btn{font-size:15px;padding:8px 18px;border-radius:12px;color:#1A1200;border:3px solid var(--deep);
      background:linear-gradient(180deg,#FFE27A,var(--gold) 50%,#F2A900);box-shadow:0 5px 0 #B47400,0 7px 12px rgba(0,0,0,.4);
@@ -42,27 +42,31 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .btn.alt.sm{box-shadow:0 4px 0 #0F1A33}
 select{font-family:var(--ui);font-weight:700;font-size:13px;background:var(--panel);color:var(--cream);border:3px solid var(--deep);border-radius:10px;padding:7px 9px}
 
-main{flex:1;min-height:0;display:grid;grid-template-columns:1fr 320px}
+main{flex:1;min-height:0;display:grid;grid-template-columns:1fr 440px}
 .arena{position:relative;min-width:0;display:grid;place-items:center;padding:8px;overflow:hidden}
 #cv{background:#1B2B1E;border-radius:14px}
 
 aside{border-left:3px solid var(--deep);background:linear-gradient(180deg,#1F335A,var(--panel));display:flex;flex-direction:column;min-height:0}
 .sec{padding:9px 11px;border-bottom:3px solid var(--deep);min-height:0;display:flex;flex-direction:column}
-.sec h3{font-size:12px;color:var(--gold);margin-bottom:7px;flex-shrink:0;display:flex;align-items:center;gap:6px}
-.sec h3 .tag{font-size:10px;color:var(--dim);margin-left:auto}
+.sec h3{font-size:17px;color:var(--gold);margin-bottom:9px;flex-shrink:0;display:flex;align-items:center;gap:6px}
+.sec h3 .tag{font-size:11px;color:var(--dim);margin-left:auto;font-family:var(--ui);font-weight:700}
 .scroll{overflow-y:auto}
 .scroll::-webkit-scrollbar{width:8px}
 .scroll::-webkit-scrollbar-track{background:var(--deep)}
 .scroll::-webkit-scrollbar-thumb{background:var(--edge)}
 
-.rk{display:flex;align-items:center;gap:6px;padding:4px 7px;margin-bottom:4px;background:rgba(0,0,0,.28);border:2px solid var(--deep);border-radius:10px;cursor:pointer;font-weight:700}
+.rk{display:flex;align-items:center;gap:9px;padding:6px 10px;margin-bottom:5px;background:rgba(0,0,0,.28);border:2px solid var(--deep);border-radius:12px;cursor:pointer;font-weight:700}
 .rk:hover{background:rgba(255,255,255,.1)}
-.rk .n{font-size:12px;color:var(--dim);width:20px}
-.rk .mv{font-size:10px;width:20px}
-.rk canvas{width:20px;height:20px;flex-shrink:0}
-.rk .nm{flex:1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rk .wl{font-size:9px;color:var(--dim)}
-.rk .sc{font-size:14px;color:var(--gold);min-width:24px;text-align:right}
+.rk .n{font-size:17px;color:var(--dim);width:30px;text-align:center}
+.rk .mv{font-size:11px;width:26px}
+.rk canvas{width:34px;height:34px;flex-shrink:0}
+.rk .nm{flex:1;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rk .wl{font-size:11px;color:var(--dim)}
+.rk .sc{font-size:22px;color:var(--gold);min-width:40px;text-align:right}
+.rk.t1 .n{color:#FFD166;font-size:20px}.rk.t2 .n{color:#C0C8D4;font-size:18px}.rk.t3 .n{color:#D08C4A;font-size:18px}
+.rk.t1 canvas,.rk.t2 canvas,.rk.t3 canvas{width:42px;height:42px}
+.rk.t1 .nm{font-size:19px}.rk.t2 .nm,.rk.t3 .nm{font-size:17px}
+.rk.t2{background:rgba(192,200,212,.12);border-color:#7E8898}.rk.t3{background:rgba(208,140,74,.12);border-color:#8A5A2C}
 .rk.t1{background:rgba(255,201,60,.18);border-color:var(--gold)}
 .rk.off{opacity:.4}
 .adj{display:flex;gap:4px;margin-left:4px}
@@ -70,13 +74,13 @@ aside{border-left:3px solid var(--deep);background:linear-gradient(180deg,#1F335
 
 .teams{display:flex;gap:6px;padding:7px 11px;border-bottom:3px solid var(--deep)}
 .tm{flex:1;text-align:center;padding:6px;border:3px solid var(--deep);border-radius:12px;background:rgba(0,0,0,.3)}
-.tm .n{font-size:12px}
-.tm .s{font-size:19px}
+.tm .n{font-size:15px}
+.tm .s{font-size:30px}
 
-.lg{font-size:11px;color:var(--dim);padding:3px 0;line-height:1.45;border-bottom:1px dotted rgba(255,255,255,.08)}
+.lg{font-size:13.5px;color:var(--dim);padding:4px 0;line-height:1.45;border-bottom:1px dotted rgba(255,255,255,.08);font-weight:600}
 .lg.win{color:var(--green)} .lg.draw{color:var(--blue)} .lg.gold{color:var(--gold)}
 .lg.hot{color:var(--red)} .lg.warn{color:var(--red)}
-.du{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:5px 8px;background:rgba(155,92,255,.16);
+.du{display:flex;align-items:center;gap:5px;font-size:15px;font-weight:700;padding:7px 10px;background:rgba(155,92,255,.16);
     border:2px solid rgba(155,92,255,.5);border-radius:10px;margin-bottom:4px;cursor:pointer}
 .du:hover{background:rgba(179,156,255,.3)}
 .du.on{outline-color:var(--gold);background:rgba(255,209,102,.2)}
@@ -100,6 +104,17 @@ aside{border-left:3px solid var(--deep);background:linear-gradient(180deg,#1F335
   background:linear-gradient(180deg,#FFE27A,var(--gold));border:3px solid var(--deep);border-radius:999px;padding:6px 22px;display:none;animation:gold .6s infinite}
 .goldbar.on{display:block}
 @keyframes gold{50%{filter:brightness(1.25)}}
+/* 게임 중에도 계속 보이는 접속 QR (지각 입장용) */
+.livejoin{position:absolute;left:14px;bottom:14px;z-index:6;display:none;align-items:center;gap:10px;padding:9px 12px 9px 9px;
+  background:rgba(10,15,30,.86);border:3px solid var(--gold);border-radius:16px;cursor:pointer;box-shadow:0 5px 0 rgba(0,0,0,.4)}
+.livejoin.on{display:flex}
+.livejoin img{width:78px;height:78px;background:#fff;border-radius:8px;padding:3px;display:block}
+.livejoin .tx{line-height:1.35}
+.livejoin .t1{font-family:var(--px);font-size:15px;color:var(--gold)}
+.livejoin .t2{font-family:var(--px);font-size:13px;color:#fff;letter-spacing:.5px}
+.livejoin .t3{font-size:10px;color:var(--dim);font-weight:800;margin-top:2px}
+.livejoin.small img{width:54px;height:54px}
+.livejoin.small .t1{font-size:12px}.livejoin.small .t2{font-size:11px}.livejoin.small .t3{display:none}
 .camtag{position:absolute;left:14px;top:14px;display:flex;gap:6px;align-items:center;z-index:5}
 .camtag .rec{width:10px;height:10px;border-radius:50%;background:var(--red);animation:rec 1s infinite}
 @keyframes rec{50%{opacity:.2}}
@@ -151,9 +166,26 @@ aside{border-left:3px solid var(--deep);background:linear-gradient(180deg,#1F335
 .roster{margin-top:14px;flex:1;min-height:0;display:flex;flex-direction:column}
 .roster .t{font-size:12px;color:var(--dim);margin-bottom:7px;flex-shrink:0}
 .crowd{flex:1;min-height:0;overflow-y:auto;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}
-.who{width:72px;text-align:center;background:linear-gradient(180deg,#24396A,var(--panel));border:3px solid var(--deep);border-radius:12px;padding:5px 2px;box-shadow:0 4px 0 rgba(0,0,0,.3)}
-.who canvas{width:36px;height:36px}
-.who .n{font-size:10px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tut{margin-top:12px;background:linear-gradient(180deg,#24396A,var(--panel));border:3px solid var(--deep);border-radius:18px;padding:14px 18px;position:relative;overflow:hidden;min-height:250px;box-shadow:0 6px 0 rgba(0,0,0,.3)}
+.tut .hd{font-family:var(--px);font-size:24px;color:var(--gold);text-shadow:2px 2px 0 var(--deep);margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.tut .hd .k{font-size:12px;color:var(--dim);margin-left:auto;font-family:var(--ui);font-weight:700}
+.tut .body{display:flex;gap:16px;align-items:center;min-height:180px}
+.tut .txt{flex:1;font-size:15px;line-height:1.7;color:var(--cream);font-weight:600}
+.tut .txt b{color:var(--gold)}
+.tut .txt ul{margin:6px 0 0 4px;padding-left:16px}
+.tut .txt li{margin:2px 0}
+.tut .art{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;max-width:44%}
+.tut .art .fig{text-align:center;font-size:12px;font-weight:800;color:var(--dim);animation:whoIn .4s cubic-bezier(.2,1.6,.4,1) both}
+.tut .art canvas{width:86px;height:86px;display:block;margin:0 auto 2px}
+.tut .dots{position:absolute;right:16px;bottom:12px;display:flex;gap:6px}
+.tut .dots i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.2)}
+.tut .dots i.on{background:var(--gold)}
+.tut .bar{position:absolute;left:0;bottom:0;height:4px;background:var(--gold);transition:width .3s linear}
+.tut.sw .body{animation:slideX .45s cubic-bezier(.2,1,.3,1)}
+@keyframes slideX{from{transform:translateX(40px);opacity:0}}
+.who{width:82px;text-align:center;background:linear-gradient(180deg,#24396A,var(--panel));border:3px solid var(--deep);border-radius:12px;padding:5px 2px;box-shadow:0 4px 0 rgba(0,0,0,.3)}
+.who canvas{width:44px;height:44px}
+.who .n{font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* QR 크게 */
 .qrbig{position:absolute;inset:0;background:rgba(10,7,19,.96);display:none;place-items:center;z-index:20;cursor:pointer}
@@ -187,10 +219,10 @@ aside{border-left:3px solid var(--deep);background:linear-gradient(180deg,#1F335
 .wr .n{color:var(--red);font-size:11px}
 .wr .e{color:var(--dim);font-size:11px}
 
-.ticker{height:40px;flex-shrink:0;background:linear-gradient(180deg,#FFE27A,var(--gold) 50%,#F2A900);color:#1A1200;display:flex;align-items:center;overflow:hidden;border-top:3px solid var(--deep)}
-.ticker .bd{font-size:14px;padding:0 13px;height:100%;display:flex;align-items:center;background:var(--deep);color:var(--gold);flex-shrink:0;z-index:2}
+.ticker{height:52px;flex-shrink:0;background:linear-gradient(180deg,#FFE27A,var(--gold) 50%,#F2A900);color:#1A1200;display:flex;align-items:center;overflow:hidden;border-top:3px solid var(--deep)}
+.ticker .bd{font-size:18px;padding:0 16px;height:100%;display:flex;align-items:center;background:var(--deep);color:var(--gold);flex-shrink:0;z-index:2}
 .track{display:flex;white-space:nowrap;animation:roll 30s linear infinite}
-.track span{font-size:16px;padding:0 17px}
+.track span{font-size:22px;padding:0 22px}
 @keyframes roll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media (prefers-reduced-motion:reduce){.track{animation-duration:100s}}
 
@@ -342,6 +374,9 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:199;
     <div class="perf hide" id="perf"></div>
 
     <div class="goldbar" id="goldbar">⚡ 골든타임 — 모든 점수 2배</div>
+    <div class="livejoin" id="livejoin" title="클릭하면 크게 보입니다">
+      <img id="qr3" alt="접속 QR" /><div class="tx"><div class="t1">지금도 참여 가능!</div><div class="t2" id="url3">…</div><div class="t3">중간에 들어와도 따라잡기 지원을 받습니다</div></div>
+    </div>
     <div class="camtag hide" id="camtag"><div class="rec"></div><span id="camtxt">LIVE</span></div>
     <div class="cast" id="cast"><div class="vsbig">VS</div>
       <div class="hd"><span id="cast-tag">중계</span><span id="cast-left"></span><span class="x" id="cast-x">✕ 전체 보기 (Esc)</span></div>
@@ -366,6 +401,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:199;
              맵을 돌아다니다 누군가와 마주치면 성경 대결이 시작됩니다.</p>
           <div class="url" id="url">…</div>
           <p style="color:var(--gold);font-size:13px">다 모이면 오른쪽 위 <b>게임 시작</b>을 누르세요 · QR을 클릭하면 크게 보입니다</p>
+          <div class="tut" id="tut"><div class="hd"><span id="tut-h"></span><span class="k">← → 키로 넘기기</span></div><div class="body"><div class="txt" id="tut-t"></div><div class="art" id="tut-a"></div></div><div class="dots" id="tut-d"></div><div class="bar" id="tut-b"></div></div>
         </div>
         <div class="qr" id="qrwrap"><img id="qr" alt="접속 QR" /></div>
       </div>
@@ -403,8 +439,8 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:199;
 <div class="ticker"><div class="bd" id="tb">현재 순위</div><div class="track" id="track"></div></div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/sprite.js?v=15"></script>
-<script src="/audio.js?v=15"></script>
+<script src="/sprite.js?v=22"></script>
+<script src="/audio.js?v=22"></script>
 <script>
 const $ = (i) => document.getElementById(i);
 const socket = io();
@@ -461,6 +497,48 @@ socket.on("qproblems", (list) => {
   const close = () => { $("opening").classList.add("off"); SFX.init(); SFX.play("fanfare"); };
   $("opening").addEventListener("click", close, { once: true });
 })();
+/* 대기실 안내 슬라이드 */
+const TUT = [
+  { h: "⚔ 어떻게 하는 게임?", t: `폰으로 캐릭터를 만들고 광야를 돌아다닙니다.<br>다른 사람과 <b>마주치면 성경 퀴즈 대결</b>이 시작됩니다.<ul><li><b>먼저 맞히면 승리 +1</b>, 지면 −1 · 둘 다 틀리면 무승부</li><li>지면 3초 쓰러졌다가 다른 곳에서 부활</li><li>노란 화살표가 가까운 상대를 가리킵니다</li></ul>`, art: () => [rnd(0), rnd(1)] },
+  { h: "🧭 조작", t: `화면 아무 데나 <b>누른 채 끌면 이동</b>합니다.<br>오른쪽 아래 큰 원은 <b>회피</b>(3초 무적, 40초에 한 번).<br>수풀에 숨거나 은신 중이면 원이 빨간 <b>기습!</b> 버튼으로 바뀝니다.<ul><li>📜 버튼: 도전과제 · 레벨 특성 · 내 아이템</li><li>작은 원 두 개: 아이템 슬롯 (누르면 설명)</li></ul>`, art: () => [rnd(0)] },
+  { h: "☠ 보스 8종", t: `맵을 돌아다니는 보스와 부딪히면 <b>어려운 문제, 틀리면 즉시 패배</b>. 이기면 +2~6점!<ul><li>골리앗 돌진 · 바로 왕 거점 순찰 · 사자 수풀 잠복</li><li>느부갓네살 상자 파괴 · 헤롯 순간이동</li><li>에덴의 뱀 아이템 강탈 · 아말렉 둘씩 · 리워야단 물 위</li></ul>`, art: () => ["goliath","pharaoh","lion","nebuchad","herod","serpent"].map(bossFig) },
+  { h: "🦊 미니언 — 레벨업의 지름길", t: `병사·여우·메뚜기와 부딪히면 <b>쉬운 문제 12초</b>.<br>맞히면 경험치와 🔑 열쇠, <b>틀려도 손해 없음</b>.<ul><li>여우는 도망칩니다 — 잡으면 경험치 2배</li><li>열쇠로 전설 상자를 열 수 있습니다</li></ul>`, art: () => ["soldier","fox","locust"].map(minFig) },
+  { h: "📦 보물상자는 조건이 있다", t: `<ul><li><b>나무 상자</b> — 2.5초 서 있기</li><li><b>금테 상자</b> — 자물쇠 퀴즈 맞히기</li><li><b>보라·황금 상자</b> — 🔑 열쇠 필요</li></ul>가속·은신·방패·등불·두 배·모래시계·황금·전설의 왕관. 보관형은 다음 대결에서 <b>자동 발동</b>.`, art: () => [chestFig(0),chestFig(1),chestFig(2),chestFig(3)] },
+  { h: "⬆ 레벨 · 계급", t: `경험치를 모아 <b>레벨 1~10</b>. 레벨업마다 +1점, 2레벨부터 새 특성(빠른 회피 → 아이템 3칸 → 레벨 방패 → 황금 오라).<br><b>낮은 레벨이 높은 레벨을 이기면 경험치 최대 3배!</b><br>점수로는 계급이 올라 외형이 바뀝니다: 양치기 → 용사 → 백부장 → 천부장 → 사사 → 왕`, art: () => [0,1,2,3,4,5].map(tierFig) },
+  { h: "🗺 구역 6곳", t: `<b>에덴 동산</b> 구약 · <b>광야</b> 교재 문답 · <b>시내산·예루살렘</b> 암송 구절<br><b>갈릴리</b> 신약 · <b>바벨론</b> 어려운 문제(보상 큼)<br>거점(성전·제단·우물·망대·샘)에 8초 머물면 +1점.<br>보라색 포탈을 밟으면 반대편으로 순간이동.`, art: () => [] },
+  { h: "🏅 승리하면", t: `<b>전리품 스티커</b>가 쌓이고, 판이 끝나면 <b>칭호</b>를 받습니다(챔피언·불꽃·거인 사냥꾼·그림자…).<br>이긴 문제의 구절은 <b>말씀 카드</b>로 모입니다.<br>마지막 1분은 <b>⚡ 골든타임 — 모든 점수 2배</b>. 1위에겐 👑, 잡으면 +2!`, art: () => [rnd(5), rnd(4)] },
+];
+function figCanvas(draw, label){ const w = document.createElement("div"); w.className = "fig"; const c = document.createElement("canvas"); c.width = c.height = 86; w.appendChild(c); w.appendChild(document.createTextNode(label)); w._draw = (g) => draw(g); return w; }
+function rnd(tier){ const lk = { ...PX.randomLook(), tier }; return figCanvas((g) => PX.drawChar(g, 43, 84, 78, lk, PX.animFrame(false, 0, Date.now()), false), ""); }
+function tierFig(t){ const lk = { sk:1, hs:0, hc:1, ft:0, cc:0, gr:0, ac:0, it:0, tier:t }; const names = ["양치기","용사","백부장","천부장","사사","왕"]; return figCanvas((g) => PX.drawChar(g, 43, 84, 78, lk, PX.animFrame(false, 0, Date.now() + t * 200), false), names[t]); }
+function bossFig(k){ const B = PX.BOSS[k]; return figCanvas((g) => PX.drawChar(g, 43, 84, 80, B.look, PX.animFrame(true, (Date.now()/16)|0, Date.now()), false), B.name); }
+function minFig(k){ const M = PX.MINION[k]; return figCanvas((g) => PX.drawMinion(g, 43, 76, 52, k, ((Date.now()/220)|0) % 2, false), M.name); }
+function chestFig(t){ const n = ["나무 · 2.5초","금테 · 퀴즈","전설 · 열쇠","황금 · 열쇠"]; return figCanvas((g) => PX.drawChest(g, 43, 50, 60, t, ((Date.now()/700)|0) % 2 ? .6 : 0), n[t]); }
+let tutIdx = 0, tutT0 = Date.now(), tutFigs = [];
+const TUT_MS = 9000;
+function showTut(i){
+  tutIdx = (i + TUT.length) % TUT.length; tutT0 = Date.now();
+  const sl = TUT[tutIdx]; $("tut-h").textContent = sl.h; $("tut-t").innerHTML = sl.t;
+  const a = $("tut-a"); a.innerHTML = ""; tutFigs = sl.art(); tutFigs.forEach((f, k) => { f.style.animationDelay = (k * .08) + "s"; a.appendChild(f); });
+  $("tut-d").innerHTML = TUT.map((_, k) => `<i class="${k === tutIdx ? "on" : ""}"></i>`).join("");
+  const el = $("tut"); el.classList.remove("sw"); void el.offsetWidth; el.classList.add("sw");
+}
+showTut(0);
+setInterval(() => {
+  if (!Wd || Wd.ph !== "lobby") return;
+  const age = Date.now() - tutT0; $("tut-b").style.width = Math.min(100, age / TUT_MS * 100) + "%";
+  if (age >= TUT_MS) showTut(tutIdx + 1);
+  tutFigs.forEach(f => { const g = f.querySelector("canvas").getContext("2d"); g.imageSmoothingEnabled = false; g.clearRect(0, 0, 86, 86); f._draw(g); });
+}, 130);
+addEventListener("keydown", e => { if (!Wd || Wd.ph !== "lobby") return; if (e.key === "ArrowRight") showTut(tutIdx + 1); if (e.key === "ArrowLeft") showTut(tutIdx - 1); });
+$("tut").addEventListener("click", () => showTut(tutIdx + 1));
+/* 대기실 캐릭터들이 살아 움직이게 */
+setInterval(() => {
+  if (!Wd || Wd.ph !== "lobby") return;
+  document.querySelectorAll("#crowd .who canvas").forEach((c, i) => { const lk = c._look; if (!lk) return;
+    const g = c.getContext("2d"); g.imageSmoothingEnabled = false; g.clearRect(0, 0, c.width, c.height);
+    PX.drawChar(g, c.width/2, c.height - 1, c.width * .95, lk, PX.animFrame(false, 0, Date.now() + i * 170), false); });
+}, 260);
 function loadHall(){
   fetch("/api/season").then(r => r.json()).then(s => {
     const h = $("hall"); if (!s.list.length) return;
@@ -473,6 +551,7 @@ fetch("/api/join-info?u=" + encodeURIComponent(location.origin)).then(r => r.jso
   joinInfo = d; EMOTES = d.emotes || [];
   $("url").textContent = d.url; $("qr").src = d.qr;
   $("url2").textContent = d.url; $("qr2").src = d.qr;
+  $("url3").textContent = d.url.replace(/^https?:\/\//, ""); $("qr3").src = d.qr;
   if (d.lan && d.lan !== d.url) $("url").title = "같은 와이파이 주소: " + d.lan;
   if (d.qproblems && d.qproblems.length) socket.emit("host:join");
 });
@@ -735,6 +814,10 @@ function updateCamera(s){
   const k = tz > cam.z ? .06 : .09;
   cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k; cam.z += (tz - cam.z) * k;
   const tag = $("camtag"); tag.classList.toggle("hide", cam.z < 1.15);
+  // 게임 중에는 접속 QR을 계속 띄우고, 중계창이 열리면 작게 줄입니다
+  const lj = $("livejoin");
+  lj.classList.toggle("on", !!Wd && Wd.ph !== "lobby" && !$("final").classList.contains("on"));
+  lj.classList.toggle("small", $("cast").classList.contains("on") || cam.z > 1.15);
   $("camtxt").textContent = "LIVE · " + (mode || "전체");
 }
 function drawMinimap(s){
@@ -893,10 +976,10 @@ function paintMeta(m){
   }
 
   const bd = $("board"); bd.innerHTML = "";
-  m.board.slice(0, 30).forEach((p, i) => {
+  m.board.slice(0, 40).forEach((p, i) => {
     const d = document.createElement("div");
     const rank = i + 1;
-    d.className = "rk" + (i === 0 && Wd && Wd.ph !== "lobby" ? " t1" : "") + (p.connected ? "" : " off");
+    d.className = "rk" + (Wd && Wd.ph !== "lobby" && i < 3 ? " t" + (i + 1) : "") + (p.connected ? "" : " off");
     d.innerHTML = `<div class="n">${rank}</div>`;
     const mv = document.createElement("div"); mv.className = "mv";
     if (p.prevRank && Wd && Wd.ph === "playing") {
@@ -905,7 +988,7 @@ function paintMeta(m){
       mv.style.color = diff > 0 ? "var(--green)" : diff < 0 ? "var(--red)" : "var(--dim)";
     }
     d.appendChild(mv);
-    d.appendChild(mini({ ...p.look, tier: p.tierIdx | 0 }, 20));
+    d.appendChild(mini({ ...p.look, tier: p.tierIdx | 0 }, Wd && Wd.ph !== "lobby" && i < 3 ? 42 : 34));
     const nm = document.createElement("div"); nm.className = "nm";
     nm.textContent = (p.tier ? p.tier + " " : "") + p.name + (p.streak >= 3 ? " 🔥" : "") + (i === 0 && p.score >= 3 ? " 👑" : "") + (p.connected ? "" : " (끊김)");
     if (MODE !== "solo" && TEAMS[p.team]) nm.style.color = TEAMS[p.team].color;
@@ -936,7 +1019,7 @@ function paintMeta(m){
     m.board.forEach(p => {
       const w = document.createElement("div"); w.className = "who";
       if (MODE !== "solo" && TEAMS[p.team]) w.style.borderColor = TEAMS[p.team].color;
-      w.appendChild(mini(p.look, 36));
+      const mc = mini(p.look, 44); mc._look = p.look; w.appendChild(mc);
       const n = document.createElement("div"); n.className = "n"; n.textContent = p.name; w.appendChild(n);
       w.title = "두 번 클릭하면 내보내기";
       w.ondblclick = () => { if (confirm(p.name + " 님을 내보낼까요?")) socket.emit("host:kick", p.id); };
@@ -1132,6 +1215,7 @@ function renderTicker(m){
 
 /* ── 기타 ── */
 $("qrwrap").onclick = () => $("qrbig").classList.add("on");
+$("livejoin").onclick = (e) => { e.stopPropagation(); $("qrbig").classList.add("on"); };
 $("qrbig").onclick = () => $("qrbig").classList.remove("on");
 $("m-season").onclick = async () => {
   const s = await fetch("/api/season").then(r => r.json());
