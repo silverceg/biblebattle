@@ -588,7 +588,8 @@ input:focus{outline:none;border-color:var(--yellow)}
   let lastTap = 0;
   document.addEventListener("touchend", (e) => {
     const now = Date.now();
-    if (now - lastTap < 320) e.preventDefault();
+    const onBtn = e.target && e.target.closest && e.target.closest("button, input, select, label, a");
+    if (now - lastTap < 320 && !onBtn) e.preventDefault();          // 버튼은 빠르게 연달아 눌러도 되게
     lastTap = now;
   }, { passive: false });
   // 그래도 확대됐으면 되돌리기 (visualViewport 로 배율 감시)
@@ -753,7 +754,16 @@ input:focus{outline:none;border-color:var(--yellow)}
 <script src="/audio.js?v=27"></script>
 <script>
 const $ = (i) => document.getElementById(i);
+const setText = (el, t) => { if (el && el.textContent !== t) el.textContent = t; };   // 바뀔 때만 고쳐 폰이 덜 버벅이게
+/* 게임 버튼: 손가락이 닿는 순간 반응 — 다른 손가락으로 조이스틱을 누른 채여도 됩니다
+   (두 번째 손가락 탭에서는 click 이 생기지 않고, 확대 방지용 두 번 탭 막기가 click 을 삼키기도 해서) */
+function onTap(el, fn){
+  el.addEventListener("pointerdown", (e) => { if (e.button > 0) return; e.stopPropagation(); fn(e); });
+  el.addEventListener("click", (e) => e.stopPropagation());
+}
+const setHTML = (el, h) => { if (el && el._h !== h) { el._h = h; el.innerHTML = h; } };
 const socket = io({ transports: ["websocket", "polling"] });
+socket.on("connect_error", () => { socket.io.opts.transports = ["polling", "websocket"]; });   // 웹소켓이 막힌 곳이면 예전 방식으로
 const KEY = "bpb_player", DEX = "bpb_cards", TITLES = "bpb_titles", STK = "bpb_stickers";
 const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -938,8 +948,10 @@ function applyInput(inp){
 
 /* ── 다른 사람: 시간 보간 (100ms 뒤를 그려 튐 없음) ── */
 const near = new Map();
-const LAG = 110;
-function pushSnap(v, x, y){ v.buf.push({ t: Date.now(), x, y }); if (v.buf.length > 6) v.buf.shift(); }
+const LAG = 140;                                     // 서버 시계로 140ms 전을 그림 (서버는 1초에 10번 보냄)
+let pSkew = null;                                    // (받은 시각 − 서버가 보낸 시각)의 최솟값
+const pNow = () => pSkew == null ? Date.now() : Date.now() - pSkew;
+function pushSnap(v, x, y, t){ t = t || Date.now(); const b = v.buf; if (b.length && t <= b[b.length - 1].t) return; b.push({ t, x, y }); if (b.length > 8) b.shift(); }
 function posAt(v, t){
   const b = v.buf; if (!b.length) return { x: v.x, y: v.y };
   if (t <= b[0].t) return b[0];
@@ -963,7 +975,8 @@ function showMake(hint){
 socket.on("roster", (r) => { roster = new Map(r.list.map(p => [p.u, p])); TEAMS = r.teams || []; MODE = r.mode; });
 socket.on("mapChanged", () => loadMap());
 socket.on("joined", (p) => {
-  me = p; look = p.look; localStorage.setItem(KEY, JSON.stringify(p));
+  me = p; look = p.look; localStorage.setItem(KEY, JSON.stringify(p)); pickedOid = 0;
+  if (p.ph === "countdown" || p.ph === "playing" || p.ph === "paused") { $("over").classList.remove("on"); $("result").classList.remove("on"); }   // 지난 판 결과 화면에 갇히지 않게
   const between = p.ph === "lobby" || p.ph === "ended", wasAuto = autoJoining; autoJoining = false;
   if (wasAuto && between) { showMake("지난번 캐릭터예요 — 이름·모습을 바꾸거나 그대로 출전!"); return; }
   $("mkhint").textContent = "";
@@ -985,7 +998,14 @@ socket.on("portal", (p) => { if (p && p.x != null) { P.x = p.x; P.y = p.y; CAM.x
   flash("radial-gradient(circle,rgba(155,92,255,.45),transparent 72%)"); toast("🌀 순간이동!", 1400); });
 socket.on("me", (f) => {
   F = f;
-  if (me && !$("make").classList.contains("hide") && (f.ph === "countdown" || f.ph === "playing" || f.ph === "paused") && !autoJoining) {
+  // 서버에는 문제가 없는데 폰에만 문제 창이 남아 있으면 닫기 (끊겼다 돌아온 경우 등)
+  if (D && !f.dl && Date.now() - duelShownAt > 1500) { paintHud.noDl = (paintHud.noDl || 0) + 1; if (paintHud.noDl >= 3) { paintHud.noDl = 0; socket.listeners("duelEnd")[0]({ kind: "cancel", result: "cancel" }); } } else paintHud.noDl = 0;
+  if ((f.ph === "countdown" || f.ph === "playing") && $("over").classList.contains("on")) { $("over").classList.remove("on"); $("result").classList.remove("on"); }
+  if (f.sv) { const sk = Date.now() - f.sv; pSkew = pSkew == null || sk < pSkew ? sk : pSkew + (sk - pSkew) * .01; }
+  const sv = f.sv || Date.now();
+  if (me && !$("make").classList.contains("hide") && f.ph === "countdown" && !autoJoining)   // 카운트다운 중엔 아직 바꿀 수 있음 — 알려만 줌
+    setText($("mkhint"), `⏱ ${f.cd || ""}초 뒤 시작! 바꿀 게 있으면 지금 바꾸고 '출전!'을 누르세요`);
+  if (me && !$("make").classList.contains("hide") && (f.ph === "playing" || f.ph === "paused") && !autoJoining) {
     $("make").classList.add("hide"); $("play").classList.add("on"); $("mkhint").textContent = ""; fitCanvas();
     toast("게임이 시작돼서 지금 모습으로 참가합니다", 2600);
   }
@@ -1007,16 +1027,16 @@ socket.on("me", (f) => {
     seen.add(a[0]);
     let v = near.get(a[0]);
     if (!v) near.set(a[0], (v = { x:a[1], y:a[2], buf:[] }));
-    pushSnap(v, a[1], a[2]);
+    pushSnap(v, a[1], a[2], sv);
     v.fl = a[3]; v.wk = a[4]; v.fc = a[5]; v.tm = a[6]; v.tier = a[7] | 0; v.em = a[8] | 0; v.lv = a[9] || 1; v.hp = a[10] == null ? 100 : a[10];
   });
   (f.bosses || []).forEach(b => { const k = -100 - b[5]; seen.add(k);
     let v = near.get(k); if (!v) near.set(k, (v = { x:b[0], y:b[1], buf:[], boss:b[4] }));
-    pushSnap(v, b[0], b[1]); v.wk = b[2]; v.fc = b[3]; v.boss = b[4]; v.dash = b[7];
+    pushSnap(v, b[0], b[1], sv); v.wk = b[2]; v.fc = b[3]; v.boss = b[4]; v.dash = b[7];
     if (!seenBoss.has(b[5] + ":" + b[4])) { seenBoss.add(b[5] + ":" + b[4]); if (seenBoss.size > 2) popBoss.set(k, Date.now()); } });
   for (const k of [...near.keys()]) if (!seen.has(k)) near.delete(k);
   const seenM = new Set();
-  (f.mn || []).forEach(a => { seenM.add(a[0]); let v = minions.get(a[0]); if (!v) minions.set(a[0], (v = { x:a[1], y:a[2], buf:[], type:a[3] })); pushSnap(v, a[1], a[2]); v.wk = a[4]; v.fc = a[5]; });
+  (f.mn || []).forEach(a => { seenM.add(a[0]); let v = minions.get(a[0]); if (!v) minions.set(a[0], (v = { x:a[1], y:a[2], buf:[], type:a[3] })); pushSnap(v, a[1], a[2], sv); v.wk = a[4]; v.fc = a[5]; });
   for (const k of [...minions.keys()]) if (!seenM.has(k)) minions.delete(k);
   paintHud(f);
 });
@@ -1088,17 +1108,17 @@ function paintHp(hp, mhp, shield){
 function paintHud(f){
   const judge = f.stg === "judge", live = f.ph === "playing" || f.ph === "paused";
   if (f.st !== "ok" && live) $("hintline").classList.add("hide");          // 관전 중엔 조작 안내를 숨김
-  $("h-cl").textContent = f.ph === "lobby" ? "대기" : f.ph === "paused" ? "멈춤" : f.ph === "countdown" ? "준비" : f.ph === "ended" ? "끝" : judge ? "심판" : fmtS(f.t);
+  setText($("h-cl"), f.ph === "lobby" ? "대기" : f.ph === "paused" ? "멈춤" : f.ph === "countdown" ? "준비" : f.ph === "ended" ? "끝" : judge ? "심판" : fmtS(f.t));
   $("h-cl").classList.toggle("warn", f.ph === "playing" && !judge && f.t <= 60);
   const sg = $("h-stg");
   if (live) {
     let txt = f.stg === "flood" ? "🌊 홍수 · 쓰러지면 탈락" : judge ? "⚖ 최후의 심판" : "🌱 성장 · 쓰러져도 부활";
     if (f.stg === "grow" && f.z && f.z[8]) txt = `🌱 성장 · 홍수까지 ${fmtS(f.z[8])}`;
     if (f.stg === "flood" && f.z) txt = `🌊 홍수 ${f.z[6] + 1}단계` + (f.z[7] ? " · 물이 차오름" : f.z[8] ? ` · 다음 ${f.z[8]}초` : " · 방주");
-    sg.textContent = txt; sg.className = "stg " + (f.stg || "grow"); sg.style.display = "";
-  } else sg.style.display = "none";
+    setText(sg, txt); if (sg.className !== "stg " + (f.stg || "grow")) sg.className = "stg " + (f.stg || "grow"); if (sg.style.display) sg.style.display = "";
+  } else if (sg.style.display !== "none") sg.style.display = "none";
   if (f.cd !== paintHud.lastCd) { if (f.cd > 0) SFX.play("count"); else if (paintHud.lastCd > 0) { SFX.play("go"); shake(280); } paintHud.lastCd = f.cd; }
-  $("cdbig").classList.toggle("on", f.cd > 0); $("cdn").textContent = f.cd || "";
+  $("cdbig").classList.toggle("on", f.cd > 0); setText($("cdn"), String(f.cd || ""));
   const want = (f.ph === "playing" || f.ph === "countdown") ? (judge || (D && D.kind === "boss") ? "boss" : f.stg === "flood" ? "duel" : "play") : "lobby";
   if (want !== paintHud.mus) { paintHud.mus = want; SFX.music(want); }
   if (f.ph === "playing") { SFX.setIntensity(judge ? 1.3 : f.stg === "flood" ? (f.z && f.z[6] >= 2 ? 1.22 : 1.1) : 1);
@@ -1113,16 +1133,15 @@ function paintHud(f){
     paintHud.hp = f.hp; paintHud.mhp = f.mhp; paintHud.quietHit = false;
   } else { paintHud.hp = null; }
   paintHp(f.hp, f.mhp, f.st === "ok" ? f.ps : 0);
-  const b = $("badges"); b.innerHTML = "";
-  const add = (t, c = "") => { const d = document.createElement("div"); d.className = "bg " + c; d.textContent = t; b.appendChild(d); };
+  let bh = "";
+  const add = (t, c = "", st = "") => { bh += `<div class="bg ${c}"${st ? ` style="${st}"` : ""}>${esc(t)}</div>`; };
   if (f.ph === "lobby") add("시작 대기 중");
   if (f.ph === "paused") add("잠시 멈춤", "warn");
   if (f.st === "ok" && live) {
     if (f.f & 256) add("🌿 잠복 중", "on");
-    if (paintHud.boost > 0) { const d = document.createElement("div"); d.className = "bg on boostbadge"; d.textContent = "🔥 따라잡기 ×2 " + paintHud.boost + "초"; b.appendChild(d); }
+    if (paintHud.boost > 0) add("🔥 따라잡기 ×2 " + paintHud.boost + "초", "on boostbadge");
     const bf = paintMeta.buffs || {};
-    const chip = (ic, nm, left, total, col) => { const d = document.createElement("div"); d.className = "buff"; d.style.borderColor = col;
-      d.innerHTML = `${ic} ${nm} <span class="bar"><i style="width:${Math.min(100, left/total*100)}%;background:${col}"></i></span> ${left}s`; b.appendChild(d); };
+    const chip = (ic, nm, left, total, col) => { bh += `<div class="buff" style="border-color:${col}">${ic} ${nm} <span class="bar"><i style="width:${Math.min(100, left/total*100)}%;background:${col}"></i></span> ${left}s</div>`; };
     if (f.f & 4) chip("👟", "속도 1.8배", bf.speed || 1, 10, "#2FA4FF");
     if (f.f & 2) chip("☁️", "은신", bf.ghost || 1, 10, "#B39CFF");
     if (f.f & 128) add("↯ 회피 중", "on");
@@ -1133,9 +1152,9 @@ function paintHud(f){
     if (f.ua === "sling") add("🎯 물맷돌 장전 — 다음 공격에서 맞히면 큰 피해!", "on");
     if (f.ua === "lamp") add(`🕯 지혜의 빛 — ${f.ul}번 남음`, "on");
     if (f.im) add(`🌊 홍해 가르기 ${f.im}초 — 무적`, "on");
-    if ((f.f & 256) || (f.f & 2)) { const d = document.createElement("div"); d.className = "bg on"; d.style.borderColor = "var(--red)"; d.style.color = "var(--red)";
-      d.textContent = F.tg && F.tg[0] === 0 ? "🗡 기습 가능! 지금 ⚔ 공격하면 경고 없이 1.5배" : "🗡 숨어 있음 — 숨은 채로 공격하면 기습"; b.appendChild(d); }
+    if ((f.f & 256) || (f.f & 2)) add(F.tg && F.tg[0] === 0 ? "🗡 기습 가능! 지금 ⚔ 공격하면 경고 없이 1.5배" : "🗡 숨어 있음 — 숨은 채로 공격하면 기습", "on", "border-color:var(--red);color:var(--red)");
   }
+  setHTML($("badges"), bh);
   if (f.zn !== paintHud.zone && ZONES[f.zn] && f.st === "ok") { if (paintHud.zone !== undefined) { const z = ZONES[f.zn]; $("zb-n").textContent = z.name; $("zb-n").style.color = z.color;
       $("zb-d").textContent = ({ ot: "구약 문제", nt: "신약 문제", person: "인물 문제", fun: "넌센스 문제", hard: "어려운 문제" })[z.cat] || "성경 문제";
       const el = $("zonebn"); el.classList.remove("on"); void el.offsetWidth; el.classList.add("on"); SFX.play("capture"); } paintHud.zone = f.zn; }
@@ -1200,27 +1219,25 @@ function paintXp(level, xp, base, next){
 }
 function paintMeta(m){
   MODE = m.mode;
-  $("h-al").textContent = m.alive; $("h-tot").textContent = `/${m.total} 생존`; $("h-kl").textContent = "⚔" + (m.kills || 0);
-  $("h-atk").textContent = "⚔" + m.atk + (m.def ? ` 🛡${m.def}%` : "");
-  $("h-rk").textContent = m.place ? `탈락 · ${m.place}위` : m.rank && F && F.ph === "playing" ? `생존 ${m.rank}위` + (m.streak >= 2 ? ` · ${m.streak}연속 명중` : "") : "";
+  setText($("h-al"), String(m.alive)); setText($("h-tot"), `/${m.total} 생존`); setText($("h-kl"), "⚔" + (m.kills || 0));
+  setText($("h-atk"), "⚔" + m.atk + (m.def ? ` 🛡${m.def}%` : ""));
+  setText($("h-rk"), m.place ? `탈락 · ${m.place}위` : m.rank && F && F.ph === "playing" ? `생존 ${m.rank}위` + (m.streak >= 2 ? ` · ${m.streak}연속 명중` : "") : "");
   const sl = $("slots").children;
   paintMeta.items = m.items;
   for (let i = 0; i < 2 && sl[i]; i++) { const it = m.items[i]; sl[i].textContent = it ? it.icon : "·"; sl[i].classList.toggle("has", !!it); sl[i].title = it ? it.name : ""; }
   paintXp(m.level || 1, m.xp || 0, m.xpBase || 0, m.xpNext || 50);
   const perk = m.perk || {}, got = CARDINFO.filter(c => perk[c.id]);
-  $("perks").innerHTML = got.length ? got.map(c => `<div class="bi"><span>${c.icon}</span><span><b>${esc(c.name)} ×${perk[c.id]}</b><br>${esc(c.desc)}</span></div>`).join("")
-    : '<div class="bi" style="color:var(--dim)">레벨업·상자에서 카드를 골라 강해집니다</div>';
-  if (m.ult) $("ultinfo").innerHTML = `<div class="bi"><span>${m.ult.icon}</span><span><b>${esc(m.ult.name)}</b> · ${m.ult.cd}초마다<br>${esc(m.ult.desc)}</span></div>`;
+  setHTML($("perks"), got.length ? got.map(c => `<div class="bi"><span>${c.icon}</span><span><b>${esc(c.name)} ×${perk[c.id]}</b><br>${esc(c.desc)}</span></div>`).join("")
+    : '<div class="bi" style="color:var(--dim)">레벨업·상자에서 카드를 골라 강해집니다</div>');
+  if (m.ult) setHTML($("ultinfo"), `<div class="bi"><span>${m.ult.icon}</span><span><b>${esc(m.ult.name)}</b> · ${m.ult.cd}초마다<br>${esc(m.ult.desc)}</span></div>`);
   paintHud.boost = m.boost || 0;
-  $("h-keys").textContent = m.keys ? "🔑×" + m.keys : "";
-  const ql = $("qlist"); ql.innerHTML = "";
-  (m.quests || []).forEach(q => { const d = document.createElement("div"); d.className = "qi" + (q.done ? " done" : "");
-    d.innerHTML = `<div class="nm">${esc(q.name)}<div style="font-size:9px;color:var(--dim);font-weight:600">${esc(q.desc)}</div></div>
-      <div class="pg"><i style="width:${q.have/q.need*100}%"></i></div><div class="bn">+30</div>`; ql.appendChild(d); });
+  setText($("h-keys"), m.keys ? "🔑×" + m.keys : "");
+  setHTML($("qlist"), (m.quests || []).map(q => `<div class="qi${q.done ? " done" : ""}"><div class="nm">${esc(q.name)}<div style="font-size:9px;color:var(--dim);font-weight:600">${esc(q.desc)}</div></div>
+      <div class="pg"><i style="width:${q.have/q.need*100}%"></i></div><div class="bn">+30</div></div>`).join(""));
   paintMeta.buffs = m.buffs || {};
   const tb = $("teambar");
-  tb.innerHTML = (m.mode === "solo" || !m.teams.length) ? "" :
-    m.teams.map(t => `<div class="tm ot" style="color:${t.color};border-color:${t.color};${t.alive ? "" : "opacity:.4;text-decoration:line-through"}">${t.name} ${t.alive}명</div>`).join("");
+  setHTML(tb, (m.mode === "solo" || !m.teams.length) ? "" :
+    m.teams.map(t => `<div class="tm ot" style="color:${t.color};border-color:${t.color};${t.alive ? "" : "opacity:.4;text-decoration:line-through"}">${t.name} ${t.alive}명</div>`).join(""));
   if (m.cards && !$("cards").classList.contains("on") && !D && (!F || F.st === "ok")) showCards(m.cards);
   if ($("praypick").classList.contains("on")) renderPrayList(m);
 }
@@ -1295,7 +1312,8 @@ function frame(){
   const w = cv.clientWidth, h = cv.clientHeight; if (!w) return;
   if (Math.abs(cvCssW - w) > 2 || cvDpr !== wantDpr()) fitCanvas();
   const t = Date.now();
-  CAM.x += (P.x - CAM.x) * .22; CAM.y += (P.y - CAM.y) * .22;   // 카메라가 부드럽게 따라감
+  const fk = Math.min(4, Math.max(.25, (t - (frame.lastT || t - 16)) / 16.7)); frame.lastT = t;   // 느린 폰에서도 같은 속도 (60fps 기준 배율)
+  { const kc = 1 - Math.pow(1 - .22, fk); CAM.x += (P.x - CAM.x) * kc; CAM.y += (P.y - CAM.y) * kc; }   // 카메라가 부드럽게 따라감
   let S = Math.max(1.7, Math.min(w, h * 1.35) / 340);
   { const age = (t - zoomPulse) / 900; if (age < 1) S *= 1 + .22 * (1 - age) * (1 - age); }   // 진입 순간 펀치 줌
   const cxp = w/2, cyp = h/2;
@@ -1338,7 +1356,7 @@ function frame(){
     cx.globalAlpha = 1;
   }
 
-  const size = 54, rt = t - LAG;
+  const size = 54, rt = pNow() - LAG;
   minions.forEach((v, id) => { const p = posAt(v, rt); v.x = p.x; v.y = p.y; const x = toX(p.x), y = toY(p.y); const M = PX.MINION[v.type] || PX.MINION.soldier;
     drawBase(x, y, 30, M.color, .35);
     PX.drawMinion(cx, x, y + 12, 36, v.type, PX.animFrame(true, v.wk, t), v.fc < 0);
@@ -1431,11 +1449,11 @@ function frame(){
     cx.fillStyle = "#FFFFFF"; cx.beginPath(); cx.arc(x1 + (x2 - x1) * e, y1 + (y2 - y1) * e, 6, 0, 7); cx.fill();
     cx.restore();
     if (k >= 1 && !b.boom) { b.boom = true; spark(x2, y2, b.c, 16, 3); } }
-  for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.x += p.vx; p.y += p.vy; p.vy += .17; p.life -= .026;
+  for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.x += p.vx * fk; p.y += p.vy * fk; p.vy += .17 * fk; p.life -= .026 * fk;
     if (p.life <= 0) { parts.splice(i, 1); continue; } cx.globalAlpha = Math.max(0, p.life); cx.fillStyle = p.c; cx.fillRect(p.x, p.y, p.s, p.s); }
   cx.globalAlpha = 1;
   cx.font = "700 18px " + getComputedStyle(document.body).getPropertyValue("--dp"); cx.textAlign = "center"; cx.textBaseline = "middle";
-  for (let i = floats.length - 1; i >= 0; i--) { const f2 = floats[i]; f2.y -= 1.2; f2.life -= .015;
+  for (let i = floats.length - 1; i >= 0; i--) { const f2 = floats[i]; f2.y -= 1.2 * fk; f2.life -= .015 * fk;
     if (f2.life <= 0) { floats.splice(i, 1); continue; } cx.globalAlpha = Math.max(0, Math.min(1, f2.life*1.6));
     cx.fillStyle = "#0A0F1E"; cx.fillText(f2.txt, f2.x+2, f2.y+2); cx.fillStyle = f2.c; cx.fillText(f2.txt, f2.x, f2.y); }
   cx.globalAlpha = 1;
@@ -1493,19 +1511,22 @@ function release(e){ if (e.pointerId !== touchId) return; touchId = null; vec = 
 zone.addEventListener("pointerup", release); zone.addEventListener("pointercancel", release);
 
 /* 입력 루프 — 50ms마다 내 위치를 먼저 움직이고 서버로 보냅니다 */
-let lastIn = performance.now();
+let lastIn = performance.now(), sentStill = false;
 setInterval(() => {
   const t = performance.now(), dt = Math.min(.08, (t - lastIn) / 1000); lastIn = t;
   const len = Math.hypot(vec.x, vec.y);
   const down = F && (F.st !== "ok" || D || F.stg === "judge");
   moving = len > .12 && F && F.ph === "playing" && !down;
   if (!F || F.ph !== "playing" || !MAPI) return;
+  const still = !moving;
+  if (still && sentStill) return;                              // 가만히 있을 땐 보내지 않음 — 서버 부담 줄이기
+  sentStill = still;
   const inp = { s: ++seq, x: down ? 0 : vec.x, y: down ? 0 : vec.y, dt };
   if (moving) { applyInput(inp); pending.push(inp); if (pending.length > 40) pending.shift(); }
   socket.volatile.emit("move", inp);
 }, 50);
-$("dodge").onclick = (e) => { e.stopPropagation(); socket.emit("dodge"); buzz(30); };
-$("ultb").onclick = (e) => { e.stopPropagation(); if (!F || F.ult !== 0 || F.ua) return; socket.emit("ult"); buzz(40); };
+onTap($("dodge"), () => { if ($("dodge").disabled) return; socket.emit("dodge"); buzz(30); });
+onTap($("ultb"), () => { if (!F || F.ult !== 0 || F.ua) return; socket.emit("ult"); buzz(40); });
 /* ── 공격 ── */
 let lastAtk = null;
 function targetName(tg){
@@ -1522,7 +1543,7 @@ function doAttack(){
   lastAtk = { k: F.tg[0], id: F.tg[1] };
   socket.emit("attack", { k: F.tg[0], id: F.tg[1] }); buzz(30); SFX.play("click");
 }
-$("atkb").onclick = (e) => { e.stopPropagation(); doAttack(); };
+onTap($("atkb"), () => doAttack());
 addEventListener("keydown", (e) => {                                   // 컴퓨터로 해 볼 때: 스페이스 = 공격
   if (document.activeElement && document.activeElement.tagName === "INPUT") return;
   if (e.code === "Space") { e.preventDefault(); doAttack(); }
@@ -1545,9 +1566,14 @@ socket.on("aimEnd", (r) => {
 });
 socket.on("attackNo", (m) => { toast("⚔ " + m.msg, 1400); buzz(40); });
 /* ── 강화 카드 ── */
-let cardsTimer = 0, cardsQueued = null;
+let cardsTimer = 0, cardsOid = 0, pickedOid = 0, expiredOid = 0, expiredAt = 0, cardsShownAt = 0;
+/* 같은 카드 묶음(oid)은 한 번만: 고른 뒤 늦게 도착한 정보로 같은 카드가 다시 뜨지 않게 */
 function showCards(c){
-  if (D) { cardsQueued = c; return; }
+  if (D || !c || !c.opts || !c.opts.length) return;
+  if (c.oid && c.oid === pickedOid) return;
+  if (c.oid && c.oid === expiredOid && Date.now() - expiredAt < 2500) return;
+  if (c.oid && c.oid === cardsOid && $("cards").classList.contains("on")) return;
+  cardsOid = c.oid || 0;
   const el = $("cards"), row = $("cd-row");
   const SRC = c.src === "box" ? (["📦 나무 상자", "🟨 금테 상자", "💜 전설 상자", "💎 숨겨진 보물"][c.tier] || "📦 상자") : c.src === "gift" ? "🎁 지각 선물" : `⬆ 레벨 ${c.level}`;
   $("cd-h").textContent = `${SRC} — 강화 카드를 고르세요` + (c.more > 0 ? ` (+${c.more})` : "");
@@ -1556,12 +1582,15 @@ function showCards(c){
   c.opts.forEach((o, k) => { const b = document.createElement("button"); b.className = "kc t" + (o.tier || 0); b.style.animationDelay = (k * .08) + "s";
     b.innerHTML = (o.tier ? `<div class="rar">${o.tier === 2 ? "★ 전설" : "◆ 희귀"}</div>` : "") + `<div class="ic">${o.icon}</div><div class="nm"></div><div class="ds"></div><div class="st">${perk[o.id] ? "지금 " + perk[o.id] + "개" : k === 0 ? "추천" : ""}</div>`;
     b.querySelector(".nm").textContent = o.name; b.querySelector(".ds").textContent = o.desc;
-    b.onclick = (e) => { e.stopPropagation(); socket.emit("card", { id: o.id }); el.classList.remove("on"); clearInterval(cardsTimer); SFX.play("card"); buzz(25); };
+    onTap(b, () => { if (Date.now() - cardsShownAt < 450) return;            // 막 뜬 순간 공격 버튼을 누르던 손가락에 잘못 골라지지 않게
+      if (c.oid && pickedOid === c.oid) return; pickedOid = c.oid || 0;
+      [...row.children].forEach(x => x.disabled = true);
+      socket.emit("card", { id: o.id, oid: c.oid }); el.classList.remove("on"); clearInterval(cardsTimer); SFX.play("card"); buzz(25); });
     row.appendChild(b); });
-  el.classList.add("on"); SFX.play("card");
+  el.classList.add("on"); SFX.play("card"); cardsShownAt = Date.now();
   const total = (c.left || 12) * 1000, t0 = Date.now(); clearInterval(cardsTimer);
   cardsTimer = setInterval(() => { const left = Math.max(0, total - (Date.now() - t0)); $("cd-bar").style.width = (left / total * 100) + "%";
-    if (left <= 0) { clearInterval(cardsTimer); el.classList.remove("on"); } }, 100);
+    if (left <= 0) { clearInterval(cardsTimer); el.classList.remove("on"); expiredOid = c.oid || 0; expiredAt = Date.now(); } }, 100);
 }
 socket.on("cards", (c) => showCards(c));
 socket.on("cardOk", (c) => { $("cards").classList.remove("on"); clearInterval(cardsTimer);
@@ -1700,7 +1729,9 @@ function facecard(el, name, info, lk, sub, emoji){
 }
 function bigface(id, lk){ PX.portrait($(id), 100, 100, lk); }
 const MIN_ICON = { soldier: "🗡", fox: "🦊", locust: "🦗" };
+let duelShownAt = 0;
 socket.on("duel", (d) => {
+  duelShownAt = Date.now();
   D = d; D.endsAt = Date.now() + (d.left != null ? d.left : d.limit * 1000); pick = null; vec = { x:0, y:0 }; stick.classList.remove("on");
   $("cards").classList.remove("on"); clearInterval(cardsTimer);
   const k = d.kind, pvp = k === "pvp", boss = k === "boss", foe = d.foe || {}, atk = k === "attack";
@@ -1740,8 +1771,9 @@ socket.on("duel", (d) => {
   d.options.forEach((op, i) => {
     const b = document.createElement("button"); b.className = "dop d" + i + (hide.includes(i) ? " gone" : "");
     b.innerHTML = `<span class="s">${LET[i]}</span><span class="l"></span>`; b.querySelector(".l").textContent = op;
-    b.onclick = () => { if (pick !== null || hide.includes(i)) return; pick = i; buzz(20); SFX.play("click"); b.classList.add("pickme");
-      [...o.children].forEach(c => c.style.pointerEvents = "none"); socket.emit("answer", { duelId: d.id, choice: i }); };
+    onTap(b, () => { if (pick !== null || hide.includes(i) || Date.now() - duelShownAt < 300) return;   // 공격 버튼 두 번 누름이 보기로 잘못 들어가지 않게
+      pick = i; buzz(20); SFX.play("click"); b.classList.add("pickme");
+      [...o.children].forEach(c => c.style.pointerEvents = "none"); socket.emit("answer", { duelId: d.id, choice: i }); });
     o.appendChild(b);
   });
   $("ambtag").innerHTML = d.ambush === "attacker" ? '<span class="ambtag">🌿 기습 — 경고 없이 피해 1.5배!</span>' : d.ambush === "victim" ? '<span class="ambtag">⚠ 기습당했다!</span>' : "";
@@ -1798,6 +1830,7 @@ socket.on("duelEnd", (r) => {
   if (r.kind === "revive") { if (r.result === "win") { SFX.play("correct"); bigmsg("✨", `정답! ${r.got}/${r.need}`, r.got >= r.need ? "곧 다시 일어납니다!" : "한 문제만 더!", 1500); }
     else { SFX.play("wrong"); bigmsg("💨", "아쉽다", "정답: " + ansTxt + " · 다음 문제가 나와요", 2000); } return; }
   if (r.kind === "teamrev") { if (r.result === "win") { SFX.play("heal"); bigmsg("🤝", (r.name || "팀원") + " 부활!", "팀원을 살렸습니다", 2000); }
+    else if (r.result === "late") { SFX.play("draw"); bigmsg("💫", "정답!", `하지만 ${r.name || "팀원"}은(는) 이미 일어났거나 탈락했어요`, 1800); }
     else { SFX.play("wrong"); bigmsg("💨", "아쉽다", "곁에 있으면 다시 문제가 나와요", 1600); } return; }
   if (r.kind === "pray") { if (r.result === "win") { SFX.play("correct"); bigmsg("🙏", `기도 ${r.got}/${r.need}`, r.gave ? `${r.gave}에게 기도 방패!` : r.wait ? `${r.target}이(가) 방패를 받을 수 있으면 바로 보내요 (${r.wait}초)` : "계속 기도해요", 1600); }
     else { SFX.play("wrong"); bigmsg("💨", "아쉽다", "정답: " + ansTxt, 1600); } return; }
