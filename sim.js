@@ -28,6 +28,7 @@ const seenD = new Set(), duelsBy = { grow: 0, flood: 0 }, downBy = { grow: 0, fl
 let hpAtFlood = null; const cause = {}; let hpByG = null;
 H.on("connect", () => H.emit("host:join"));
 H.on("world", (w) => {
+  countFx(w.fx);
   W = w;
   if (w.ph === "playing") {
     if (!t0) t0 = Date.now();
@@ -39,7 +40,8 @@ H.on("world", (w) => {
       hpByG = {}; for (const s of bots) { if (!s.f) continue; const g = s.prof.g; (hpByG[g] = hpByG[g] || []).push(Math.round(s.f.hp / Math.max(1, s.f.mhp) * 100)); } }
   }
 });
-H.on("meta", (m) => { M = m; (m.fx || []).forEach((f) => { if (f.k === "ult") counts.ult[f.cls] = (counts.ult[f.cls] || 0) + 1; if (f.k === "pray") counts.pray++; if (f.k === "hit") { counts.hits++; counts.dmg += f.dmg || 0; } if (f.k === "revive") counts.revive++; if (f.k === "down") { counts.down++; downBy[(W && W.stg) || "grow"]++; cause[f.kind || "?"] = (cause[f.kind || "?"] || 0) + 1; } }); });
+const countFx = (list) => (list || []).forEach((f) => { if (f.k === "ult") counts.ult[f.cls] = (counts.ult[f.cls] || 0) + 1; if (f.k === "pray") counts.pray++; if (f.k === "hit") { counts.hits++; counts.dmg += f.dmg || 0; } if (f.k === "revive") counts.revive++; if (f.k === "down") { counts.down++; downBy[(W && W.stg) || "grow"]++; cause[f.kind || "?"] = (cause[f.kind || "?"] || 0) + 1; } });
+H.on("meta", (m) => { M = m; countFx(m.fx); });
 H.on("gameEnd", (e) => { END = e; });
 
 const bots = [];

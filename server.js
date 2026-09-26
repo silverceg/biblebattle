@@ -10,6 +10,9 @@ const fs = require("fs");
 const os = require("os");
 const QRCode = require("qrcode");
 const { Server } = require("socket.io");
+/* 예상 못 한 오류가 나도 게임 서버는 계속 돌아가게 (기록만 남김) */
+process.on("uncaughtException", (e) => { console.error("[오류]", (e && e.stack) || e); });
+process.on("unhandledRejection", (e) => { console.error("[오류]", (e && e.stack) || e); });
 
 const PORT = process.env.PORT || 3001;
 const app = express();
@@ -35,7 +38,7 @@ app.get("/sprite.js", (req, res) => {
 const TIME_SCALE = Math.max(1, Math.min(20, Number(process.env.TIME_SCALE) || 1));
 const TS = 40, R = 13;
 const SPEED = 92, MEET = 40;           // 천천히 걷는 속도 — 눈으로 따라가기 편하게
-const TICK = 1000 / 20, SEND_HOST = 1000 / 12, SEND_PHONE = 1000 / 12, SEND_META = 550;
+const TICK = 1000 / 20, SEND_HOST = 50, SEND_PHONE = 100, SEND_META = 700;   // 폰은 1초에 10번 (서버 부담 ↓, 폰은 서버 시각으로 부드럽게 보간)
 const DUEL_TIME = 18, AFTER_DUEL = 4, CELL = 120;
 /* 문제가 길면 읽을 시간을 더 줍니다: 글자 60자당 +1초 (최대 +10초) */
 const readTime = (q) => Math.min(10, Math.round((q.text.length + q.options.join("").length) / 60));
@@ -379,7 +382,7 @@ function pickGroupQuestion(list, hard) {
   return { ...q0, options: order.map((i) => q0.options[i]), answer: order.indexOf(q0.answer) };
 }
 function cleanName(raw) {
-  const n = (raw || "").trim().slice(0, 10);
+  const n = String(raw == null ? "" : raw).trim().slice(0, 10);
   if (!n) return { err: "이름을 입력해 주세요." };
   const flat = n.toLowerCase().replace(/\s/g, "");
   if (BAD_WORDS.some((w) => flat.includes(w))) return { err: "쓸 수 없는 이름이에요. 다른 이름으로 해 주세요." };
@@ -489,17 +492,18 @@ function cardOptions(p, tier) {
   return out;
 }
 /* src: "lv" 레벨업 · "box" 상자(tier 0 나무 · 1 금테 · 2 전설 · 3 보물) · "gift" 지각 선물 */
+let cardOidSeq = 0;
 function offerCards(p, level, src, tier) {
   const opts = cardOptions(p, tier || 0);
   if (!opts.length) return;
-  p.pendingCards.push({ level, opts, until: 0, src: src || "lv", tier: tier || 0 });
+  p.pendingCards.push({ oid: ++cardOidSeq, level, opts, until: 0, src: src || "lv", tier: tier || 0 });   // oid: 같은 카드 묶음을 두 번 고르는 일 방지
   if (p.pendingCards.length === 1) sendCards(p);
 }
 const CARD_MS = 12000;                  // 12초 안에 안 고르면 첫 번째 카드가 자동으로 골라집니다
 function sendCards(p) {
   const c = p.pendingCards[0]; if (!c) return;
   c.until = now() + CARD_MS;
-  if (p.socketId) io.to(p.socketId).emit("cards", { level: c.level, opts: c.opts.map((id) => CARD[id]), left: CARD_MS / 1000 / TIME_SCALE, more: p.pendingCards.length - 1, src: c.src, tier: c.tier });
+  if (p.socketId) io.to(p.socketId).emit("cards", { oid: c.oid, level: c.level, opts: c.opts.map((id) => CARD[id]), left: Math.max(0, c.until - now()) / 1000 / TIME_SCALE, more: p.pendingCards.length - 1, src: c.src, tier: c.tier });
 }
 function applyCard(p, id, auto) {
   const c = p.pendingCards[0]; if (!c || !c.opts.includes(id)) return false;
@@ -955,12 +959,12 @@ function resolveDuel(d) {
     const r = P(d.a), b = P(d.target); if (!r) return;
     r.duel = null; r.safeUntil = t + 1500;
     if (b) b.revBy = null;
-    const ok = okOf(r);
-    if (ok && b && b.st === "bleed") {
+    const ok = okOf(r), revived = ok && b && b.st === "bleed";
+    if (revived) {
       reviveAt(b, b.x, b.y, TEAMREV_HP, "team"); r.teamRevives++; addXp(r, XP.teamrev, `${b.name} 살림`);
       pushLog(`🤝 ${r.name} 이(가) ${b.name}을(를) 일으켰습니다!`, "win");
     } else { r.revNext = t + 2500; if (!ok) noteWrong(r, d.q, pickOf(r) ? pickOf(r).choice : -1); }
-    emitEnd(r, { ...res, kind: "teamrev", result: ok ? "win" : "lose", name: b ? b.name : "" });
+    emitEnd(r, { ...res, kind: "teamrev", result: revived ? "win" : ok ? "late" : "lose", name: b ? b.name : "" });
     return;
   }
   if (d.kind === "pray") {
@@ -1117,6 +1121,11 @@ function startJudgment() {
   pushLog("⚖ 최후의 심판! 남은 사람 모두 같은 문제 — 틀리면 탈락", "gold");
   bigEvent("⚖ 최후의 심판!", "gold");
   checkWin();
+  if (!G.winner) {                                     // 남은 사람이 1명(한 팀)뿐이면 심판 없이 바로 우승 (혼자 시험할 때 등)
+    const left = [...G.players.values()].filter((p) => G.participants.has(p.id) && p.st === "ok");
+    if (!teamCount() && left.length <= 1) finish(left[0] || lastStanding());
+    else if (teamCount() && new Set(left.map((p) => p.team)).size <= 1) finish(left.length ? left[0].team : lastTeamStanding());
+  }
 }
 function judgeRound() {
   const J = G.judge; if (!J || G.winner) return;
@@ -1181,6 +1190,11 @@ function judgeResolve() {
       alive.sort((a, b) => (a.hp / a.mhp) - (b.hp / b.mhp)).slice(0, -1).forEach((p) => eliminate(p, null));
     }
     checkWin();
+    if (!G.winner) {                                   // 혼자 시험하는 판 등 checkWin 이 끝내지 못하면 여기서 확실히 끝냄
+      const left = [...G.players.values()].filter((p) => G.participants.has(p.id) && p.st === "ok");
+      if (teamCount()) finish(left.length ? left[0].team : lastTeamStanding());
+      else finish(left.sort((a, b) => (b.hp / b.mhp) - (a.hp / a.mhp))[0] || lastStanding());
+    }
   }
 }
 function stepJudge(t) {
@@ -1375,7 +1389,8 @@ function stepCards(t) {
   for (const p of G.players.values()) {
     const c = p.pendingCards[0];
     if (!c || !c.until || t < c.until) continue;
-    if (p.duel && p.connected) { c.until = t + 4000; continue; }        // 대결 중이면 끝날 때까지 기다림
+    if (p.st === "out" || p.st === "spec") { p.pendingCards.length = 0; continue; }     // 탈락하면 남은 카드는 의미 없음
+    if ((p.duel || p.st === "down" || p.st === "bleed") && p.connected) { c.until = t + 4000; continue; }   // 문제 푸는 중·쓰러져 있으면 일어날 때까지 기다림
     applyCard(p, c.opts[0], true);
   }
 }
@@ -1409,7 +1424,7 @@ function step(dt, t) {
     if (p.st === "down") { stepRevive(p, t); if (G.winner) return; continue; }
     if (p.st === "bleed") {
       p.moving = false;
-      if (t >= p.bleedUntil) { p.killedBy = p.killedBy || "시간 초과"; eliminate(p, null); checkWin(); if (G.winner) return; }
+      if (t >= p.bleedUntil && !p.revBy) { p.killedBy = p.killedBy || "시간 초과"; eliminate(p, null); checkWin(); if (G.winner) return; }   // 팀원이 살리는 문제를 푸는 중이면 기다려 줌
       continue;
     }
     p.moving = !p.duel && (t - (p.lastInput || 0) < 180) && Math.hypot(p.ix, p.iy) > .12;
@@ -1644,7 +1659,7 @@ function updateBoss(dt, t) {
       else { const bush = b.bushTarget || (b.bushTarget = nearestBush(b)); if (bush) { tx = bush.x; ty = bush.y; if (Math.hypot(tx - b.x, ty - b.y) < 20) b.bushTarget = null; } }
     } else if (b.type === "nebuchad") {                  // 약탈: 가까운 상자로 가서 부숨
       let bx = null, bdd = 460;
-      for (const box of G.boxes) { const d = Math.hypot(box.x - b.x, box.y - b.y); if (d < bdd) { bdd = d; bx = box; } }
+      for (const box of G.boxes) { if (box.busy) continue; const d = Math.hypot(box.x - b.x, box.y - b.y); if (d < bdd) { bdd = d; bx = box; } }   // 자물쇠 퀴즈 중인 상자는 건드리지 않음
       if (bx && !(target && bd < 120)) { tx = bx.x; ty = bx.y;
         if (bdd < 30) { G.boxes = G.boxes.filter((x) => x !== bx); G.opened.push([bx.x | 0, bx.y | 0, bx.tier, t]);
           pushLog("👑 느부갓네살이 보물상자를 부쉈습니다!", "warn"); } }
@@ -1797,6 +1812,7 @@ setInterval(() => {
   }
   const fd = G.duels.get(G.featured);
   io.to("host").volatile.emit("world", {
+    st: Date.now(),                                             // 보낸 시각 — 관전 화면이 이 시각 기준으로 부드럽게 그립니다
     ph: G.phase, t: leftSec(), seq: rosterSeq, mapSeq: MAP.seq, stg: G.stage, al: aliveCount(), tot: G.participants.size,
     cd: G.phase === "countdown" ? Math.max(0, Math.ceil((G.countdownEnd - t) / 1000)) : 0,
     p, d, zn: zonePacket(), j: G.stage === "judge" ? judgePacket() : null, win: G.winner,
@@ -1807,6 +1823,9 @@ setInterval(() => {
                  left: Math.max(0, Math.ceil((fd.endsAt - t) / 1000)),
                  a: sideOf(fd, fd.a), b: fd.kind === "boss" ? { name: BOSSES[fd.boss].name, boss: true } : sideOf(fd, fd.kind === "attack" ? fd.target : fd.b) } : null,
     reveal: (G.reveal && t < G.reveal.until) ? G.reveal : null,
+    bx: G.boxes.map((b) => [b.x | 0, b.y | 0, b.tier, b.id]),               // 상자도 자주 보내 폰과 어긋나지 않게
+    op: G.opened.length ? G.opened.splice(0, G.opened.length).map((o) => [o[0], o[1], o[2]]) : null,
+    fx: G.fx.length ? G.fx.splice(0, G.fx.length) : null,                    // 명중·쓰러짐 연출도 바로바로
   });
 }, SEND_HOST);
 
@@ -1814,14 +1833,13 @@ setInterval(() => {
   io.to("host").emit("meta", {
     board: boardList(), log: G.log.slice(0, 8), mode: G.mode, teams: teamStatus(),
     boxes: G.boxes.map((b) => [b.x | 0, b.y | 0, b.tier, b.id]),
-    opened: G.opened.splice(0, G.opened.length).map((o) => [o[0], o[1], o[2]]),
     caps: MAP.caps.map((c) => [c.x | 0, c.y | 0, c.r, c.name]),
     portals: MAP.portals.map(([a, b]) => [a.x | 0, a.y | 0, b.x | 0, b.y | 0]),
     treasureHint: G.treasure ? G.treasure.hint : null,
     qUsed: G.usedQ.size, qTotal: G.questions.length, qfile: G.qfile, qfiles: questionFiles(),
     stage: G.stage, floodIdx: G.floodIdx, floods: FLOOD.length, zones: ZONES, tiers: TIERS,
-    events: G.events.splice(0, G.events.length), fx: G.fx.splice(0, G.fx.length),
-    stats: { tick: G.stats.tickAvg, tickMax: G.stats.tickMax, players: G.players.size, duels: G.duels.size },
+    events: G.events.splice(0, G.events.length),
+    stats: { tick: G.stats.tickAvg, tickMax: G.stats.tickMax, players: G.players.size, duels: G.duels.size, cpu: HEALTH.cpu, lag: HEALTH.lagAvg, lagMax: HEALTH.lagMax, slow: HEALTH.slow },
   });
   G.stats.tickMax = 0;
 }, SEND_META);
@@ -1879,7 +1897,7 @@ setInterval(() => {
     const trn = G.treasure && Math.abs(G.treasure.x - cx) < VIEW && Math.abs(G.treasure.y - cy) < VIEW
       ? [G.treasure.x | 0, G.treasure.y | 0] : null;
     io.to(p.socketId).volatile.emit("me", {
-      ph: G.phase, t: leftSec(), x: Math.round(cx * 10) / 10, y: Math.round(cy * 10) / 10,
+      sv: Date.now(), ph: G.phase, t: leftSec(), dl: p.duel || 0, x: Math.round(cx * 10) / 10, y: Math.round(cy * 10) / 10,
       ack: p.lastSeq | 0, e: p.face, w: (p.walk | 0) % 64, tr2: tierIdx(p.level), em: t < (p.emoteUntil || 0) ? p.emote : 0,
       f: flagsOf(p, t) | (t < p.safeUntil ? 32 : 0),
       cd: G.phase === "countdown" ? Math.max(0, Math.ceil((G.countdownEnd - t) / 1000)) : 0,
@@ -1931,7 +1949,7 @@ setInterval(() => {
       boost: Math.max(0, Math.ceil(((p.catchUpUntil || 0) - t) / 1000)),
       quests: QUESTS.map((q) => ({ id: q.id, name: q.name, desc: q.desc, need: q.need, have: Math.min(q.need, p.q[q.id] || 0), done: !!p.qDone[q.id] })),
       ult: { cls: p.cls, name: U.name, icon: U.icon, desc: U.desc, cd: Math.round(ultCdFor(p) / 1000) },
-      cards: pc && pc.until ? { level: pc.level, opts: pc.opts.map((id) => CARD[id]), left: Math.max(0, Math.ceil((pc.until - t) / 1000 / TIME_SCALE)), more: p.pendingCards.length - 1, src: pc.src, tier: pc.tier } : null,
+      cards: pc && pc.until ? { oid: pc.oid, level: pc.level, opts: pc.opts.map((id) => CARD[id]), left: Math.max(0, Math.ceil((pc.until - t) / 1000 / TIME_SCALE)), more: p.pendingCards.length - 1, src: pc.src, tier: pc.tier } : null,
       survivors: out ? survivors.filter((s) => !teamCount() || s.tm === p.team || !survivors.some((x) => x.tm === p.team)) : null,
       pray: out ? { target: p.prayTarget ? numOf.get(p.prayTarget) : 0, pts: p.prayPts, need: PRAY_NEED, on: p.prayOn, given: p.prayers } : null,
       down: p.st === "down" ? { got: p.reviveGot, need: REVIVE_NEED } : null,
@@ -1947,6 +1965,7 @@ function pruneGone() {
   return n;
 }
 function startGame(min) {
+  HEALTH.quietUntil = Date.now() + 8000; HEALTH.hist = []; HEALTH.slow = false;   // 시작 순간의 부하는 '버거움'으로 치지 않음
   pruneGone();
   MAP = buildMap(...mapSizeFor(Math.max(2, G.players.size)));
   G.zone = { x: MAP.W / 2, y: MAP.H / 2, r: 1e9 };
@@ -2167,10 +2186,22 @@ app.get("/api/season", (q, r) => {
            list: Object.entries(s.players || {}).map(([n, v]) => ({ name: n, games: v.games || 0, wins: v.wins || 0, top3: v.top3 || 0, kills: v.kills || 0, bestPlace: v.bestPlace || 0 }))
                  .sort((a, b) => (b.wins - a.wins) || (b.top3 - a.top3) || (b.kills - a.kills)) });
 });
+/* 서버 건강 상태: CPU 사용률(%) · 이벤트 루프 지연(ms) — 무료 서버(0.1 CPU)에서 버거운지 확인용 */
+const HEALTH = { cpu: 0, lagAvg: 0, lagMax: 0, slow: false, hist: [], quietUntil: 0 };
+{ let lastCpu = process.cpuUsage(), lastT = process.hrtime.bigint(), lagSum = 0, lagN = 0, lagMax = 0, expect = Date.now() + 25;
+  setInterval(() => { const now2 = Date.now(), lag = Math.max(0, now2 - expect); expect = now2 + 25; lagSum += lag; lagN++; lagMax = Math.max(lagMax, lag); }, 25);
+  setInterval(() => {
+    const c = process.cpuUsage(lastCpu), t2 = process.hrtime.bigint(), wall = Number(t2 - lastT) / 1000;   // 마이크로초
+    HEALTH.cpu = +((c.user + c.system) / wall * 100).toFixed(1); lastCpu = process.cpuUsage(); lastT = t2;
+    HEALTH.lagAvg = lagN ? +(lagSum / lagN).toFixed(1) : 0; HEALTH.lagMax = lagMax; lagSum = 0; lagN = 0; lagMax = 0;
+    // 버거움 판정: 최근 5초 구간 3개 중 2개 이상 느릴 때만 (게임 시작 직후 지도 만들기처럼 한 번 튀는 건 무시)
+    if (Date.now() >= HEALTH.quietUntil) { HEALTH.hist.push(HEALTH.lagAvg > 12 || HEALTH.lagMax > 200 ? 1 : 0); if (HEALTH.hist.length > 3) HEALTH.hist.shift(); }
+    HEALTH.slow = HEALTH.hist.reduce((a, b) => a + b, 0) >= 2;
+  }, 5000); }
 app.get("/api/stats", (q, r) => {
   const m = process.memoryUsage();
   r.json({ players: G.players.size, duels: G.duels.size, phase: G.phase, mode: G.mode, stage: G.stage, alive: aliveCount(),
-           tickAvg: G.stats.tickAvg, tickMax: G.stats.tickMax,
+           tickAvg: G.stats.tickAvg, tickMax: G.stats.tickMax, cpu: HEALTH.cpu, lagAvg: HEALTH.lagAvg, lagMax: HEALTH.lagMax,
            rssMB: +(m.rss / 1048576).toFixed(1), heapMB: +(m.heapUsed / 1048576).toFixed(1) });
 });
 
@@ -2180,7 +2211,11 @@ const LOOK = (look) => ({
   ft: clamp(+look?.ft | 0, 0, 5), cc: clamp(+look?.cc | 0, 0, 11), gr: clamp(+look?.gr | 0, 0, 5),
   ac: clamp(+look?.ac | 0, 0, 7), it: clamp(+look?.it | 0, 0, 5) });
 io.on("connection", (socket) => {
-  const me = () => G.players.get(socket.data.pid);
+  // 이상한 신호 하나 때문에 서버 전체가 멈추지 않게: 모든 이벤트 처리를 감쌉니다
+  const on0 = socket.on.bind(socket);
+  socket.on = (ev, fn) => on0(ev, (...args) => { try { return fn(...args); } catch (e) { console.error("[이벤트 오류]", ev, (e && e.stack) || e); } });
+  // 이 연결이 그 학생의 '지금' 연결일 때만 (다시 접속한 뒤 늦게 끊긴 옛 연결이 학생을 끊김으로 바꾸거나 조종하지 않게)
+  const me = () => { const p = G.players.get(socket.data.pid); return p && p.socketId === socket.id ? p : null; };
   socket.on("host:join", () => {
     socket.join("host");
     socket.emit("roster", { seq: rosterSeq, list: rosterPayload(), mode: G.mode, teams: TEAMS.slice(0, teamCount()) });
@@ -2211,7 +2246,7 @@ io.on("connection", (socket) => {
   /* 일시정지: 게임 시계 자체를 멈춥니다 (홍수·부활·궁극기 시간도 함께 멈춤) */
   socket.on("host:pause", () => {
     if (G.phase === "playing") { pauseStart = rawNow(); G.pausedLeft = G.endsAt - now(); G.phase = "paused"; pushLog("잠시 멈춤"); }
-    else if (G.phase === "paused") { pauseTotal += rawNow() - pauseStart; pauseStart = 0; G.phase = "playing"; lastTick = now(); pushLog("다시 시작!"); }
+    else if (G.phase === "paused") { pauseTotal += rawNow() - pauseStart; pauseStart = 0; G.phase = "playing"; lastTick = now(); pushLog("다시 시작!"); checkWin(); }   // 멈춘 사이 마지막 한 명이 남았으면 바로 우승
   });
   socket.on("host:end", () => { if (G.phase === "playing" || G.phase === "paused" || G.phase === "countdown") endGame(); });
   socket.on("host:reset", () => resetToLobby());
@@ -2287,7 +2322,7 @@ io.on("connection", (socket) => {
       G.players.set(p.id, p);
       if (!p.lateJoin && p.st !== "spec") pushLog(`${c.name} 참가!`);
       changed = true;
-    } else if (G.phase === "lobby" || G.phase === "ended") {           // 판과 판 사이엔 이름·캐릭터를 다시 정할 수 있음
+    } else if (G.phase === "lobby" || G.phase === "ended" || G.phase === "countdown") {   // 판과 판 사이(시작 카운트다운 포함)엔 이름·캐릭터를 다시 정할 수 있음
       if (c.name !== p.name && [...G.players.values()].some((x) => x !== p && x.name === c.name && x.connected))
         return socket.emit("joinError", "같은 이름이 있어요. 한 글자만 바꿔 주세요.");
       if (c.name !== p.name || JSON.stringify(L) !== JSON.stringify(p.look)) {
@@ -2302,6 +2337,7 @@ io.on("connection", (socket) => {
     socket.emit("joined", { id: p.id, u: numOf.get(p.id), name: p.name, look: p.look, cls: p.cls, team: p.team, ult: ULTS[p.cls], ph: G.phase,
       part: G.participants.has(p.id) });
     if (p.duel && G.duels.has(p.duel)) sendDuel(p, G.duels.get(p.duel));
+    else { if (p.duel) p.duel = null; socket.emit("duelEnd", { kind: "cancel", result: "cancel" }); }   // 끊긴 사이 끝난 문제 창이 폰에 남지 않게
     if (p.pendingCards.length) later(900, () => sendCards(p));
   });
 
@@ -2355,7 +2391,7 @@ io.on("connection", (socket) => {
     const p = me();
     if (!p || !p.practiceQ) return;
     const q = p.practiceQ; p.practiceQ = null;
-    const ok = (+o.choice) === q.answer;
+    const ok = (+(o && o.choice)) === q.answer;
     if (ok && (p.practiceCorrect || 0) < 3) { p.practiceCorrect = (p.practiceCorrect || 0) + 1; p.practiceXp = (p.practiceXp || 0) + 10; }
     socket.emit("practice:r", { ok, answer: q.answer, ref: q.ref, exp: q.exp, done: p.practiceCorrect || 0, bonus: p.practiceXp || 0 });
   });
@@ -2432,7 +2468,11 @@ io.on("connection", (socket) => {
     socket.emit("ultOk", { name: U.name, icon: U.icon, effect, cd: Math.round(ultCdFor(p) / 1000) });
   });
   /* 레벨업 강화 카드 고르기 */
-  socket.on("card", (o) => { const p = me(); if (p && p.pendingCards.length) applyCard(p, o && o.id); });
+  socket.on("card", (o) => {
+    const p = me(), c = p && p.pendingCards[0];
+    if (!c || (o && o.oid != null && +o.oid !== c.oid)) return;      // 이미 고른 묶음을 또 누른 것 → 다음 묶음에 잘못 적용하지 않음
+    applyCard(p, o && o.id);
+  });
   /* 중보기도: 대상 고르기 · 켜고 끄기 */
   socket.on("pray", (o) => {
     const p = me(); if (!p || !o) return;
