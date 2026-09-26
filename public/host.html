@@ -418,7 +418,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:199;
   <div class="clock" id="clock">--:--</div>
   <div class="stgchip" id="stg">대기 중</div>
   <div class="st">생존 <b id="s-p">0</b></div>
-  <div class="st">대결 <b id="s-d">0</b></div>
+  <div class="st">공격 <b id="s-d">0</b></div>
   <div class="st">문제 <b id="s-q">0</b></div>
   <div class="grow"></div>
   <div id="ctrl" style="display:flex;gap:7px;align-items:center"></div>
@@ -463,7 +463,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:199;
         <div>
           <h1>캐릭터를 만들고 <em>광야로</em></h1>
           <p>폰으로 접속해 나만의 캐릭터를 꾸미고 이름을 정하세요.<br />
-             마주치면 성경 대결 — 맞히면 상대 체력이 깎입니다. <b style="color:var(--gold)">최후의 1인</b>이 우승!</p>
+             적 가까이에서 ⚔ 공격 — 내 폰 문제를 맞히는 순간 피해! <b style="color:var(--gold)">최후의 1인</b>이 우승!</p>
           <div class="url" id="url">…</div>
           <p style="color:var(--gold);font-size:13px">다 모이면 오른쪽 위 <b>게임 시작</b>을 누르세요 · QR을 클릭하면 크게 보입니다</p>
           <div class="tut" id="tut"><div class="hd"><span id="tut-h"></span><span class="k">← → 키로 넘기기</span></div><div class="body"><div class="txt" id="tut-t"></div><div class="art" id="tut-a"></div></div><div class="dots" id="tut-d"></div><div class="bar" id="tut-b"></div></div>
@@ -496,7 +496,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:199;
   <aside>
     <div class="teams hide" id="teams"></div>
     <div class="sec" style="flex:1.15"><h3>생존 순위 <span class="tag">이름을 누르면 선생님 도움</span></h3><div class="scroll" id="board"></div></div>
-    <div class="sec" style="flex:.5"><h3 id="dh">진행 중인 대결</h3><div class="scroll" id="duels"></div></div>
+    <div class="sec" style="flex:.5"><h3 id="dh">진행 중인 공격</h3><div class="scroll" id="duels"></div></div>
     <div class="sec" style="flex:.8;border-bottom:none"><h3>실시간 소식 <span class="tag" id="thint"></span></h3><div class="scroll" id="log"></div></div>
   </aside>
 </main>
@@ -504,8 +504,8 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:199;
 <div class="ticker"><div class="bd" id="tb">현재 순위</div><div class="track" id="track"></div></div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/sprite.js?v=26"></script>
-<script src="/audio.js?v=26"></script>
+<script src="/sprite.js?v=27"></script>
+<script src="/audio.js?v=27"></script>
 <script>
 const $ = (i) => document.getElementById(i);
 const socket = io();
@@ -527,7 +527,8 @@ const parts = [], floats = [];
 const cam = { x: 0, y: 0, z: 1, tx: 0, ty: 0, tz: 1, follow: null, auto: false, manualUntil: 0 };
 window.__cam = cam;
 let shakeT = 0;
-const doves = [], beams = [], rings = [];
+const doves = [], beams = [], rings = [], bolts = [];
+let lastHitSfx = 0;
 function spark(x, y, color, n, spd){
   for (let i = 0; i < (n || 10); i++) {
     const a = Math.random() * 6.283, v = (spd || 2.2) * (.4 + Math.random());
@@ -565,13 +566,13 @@ socket.on("qproblems", (list) => {
 })();
 /* 대기실 안내 슬라이드 */
 const TUT = [
-  { h: "⚔ 성경 서바이벌!", t: `폰으로 캐릭터를 만들고 광야를 돌아다닙니다. 누군가와 <b>마주치면 성경 퀴즈 대결</b>!<ul><li><b>맞히면 상대 체력이 깎입니다</b> — 둘 다 맞히면 먼저 맞힌 쪽 +25%</li><li>상대가 먼저 맞혀도 <b>5초 안에 맞히면 반격</b></li><li>체력이 0이 되면 쓰러짐 · <b>최후의 1인</b>이 우승</li></ul>`, art: () => [rnd(0), rnd(1)] },
+  { h: "⚔ 성경 서바이벌!", t: `폰으로 캐릭터를 만들고 광야를 돌아다닙니다.<ul><li>적 가까이(4칸)에서 <b>⚔ 공격 버튼</b> → <b>내 폰에만 8초 문제</b></li><li><b>맞히는 순간 바로 피해!</b> 4초 안에 맞히면 더 세게 · 상대는 멈추지 않아요</li><li>누가 나를 노리면 폰에 <b>빨간 경고</b> — 도망 · ↯ 회피 · 먼저 공격!</li><li>체력이 0이 되면 쓰러짐 · <b>최후의 1인</b>이 우승</li></ul>`, art: () => [rnd(0), rnd(1)] },
   { h: "🌱 → 🌊 → ⚖ 세 단계", t: `<ul><li><b>🌱 성장 (앞 절반)</b> — 쓰러져도 폰의 문제 2개를 맞히면 부활. 이때 레벨을 올려 두세요</li><li><b>🌊 홍수 (뒤 절반)</b> — 가장자리부터 물이 차오르고 물속에선 체력이 깎입니다. <b>이제 쓰러지면 탈락!</b> 방주(안전지대)로</li><li><b>⚖ 최후의 심판</b> — 시간이 다 됐는데 여럿 남으면 모두 같은 문제. 틀리면 탈락, 2라운드부터는 가장 늦게 맞힌 사람도 탈락 (팀전은 3라운드 뒤 더 많이 살아남은 팀 우승)</li></ul>`, art: () => [] },
-  { h: "⬆ 레벨업 강화 카드", t: `경험치를 모으면 레벨업! 그때마다 <b>카드 3장 중 하나</b>를 골라 강해집니다.<ul><li>❤ 튼튼한 몸 · ⚔ 날카로운 검 · 🛡 두꺼운 갑옷 · 💧 생명수</li><li>🔥 불 같은 열심 · ⚡ 준비된 마음 · 👟 날쌘 발 · 🕯 지혜 · ⏳ 침착함 · 🍞 만나</li></ul>레벨이 오르면 외형도 양치기 → 용사 → 백부장 → 천부장 → 사사 → 왕으로 바뀝니다.`, art: () => [0,1,2,3,4,5].map(tierFig) },
-  { h: "🎯 지물마다 궁극기", t: `한 번 쓰면 <b>1분 뒤</b> 다시 채워집니다 (뒤처진 친구는 더 빨리).<ul><li>🎯 물맷돌 — 다음 대결 피해 2배, <b>높은 레벨일수록 더 세게</b></li><li>🛡 방패 — 회복 + 다음 대결 피해 0 · 📜 두루마리 — 주변 적 모두에게 문제</li><li>🕯 등불 — 3번 동안 오답 2개 삭제 · 🌊 지팡이 — 밀어내고 8초 무적</li><li>🎵 수금 — 크게 회복, 팀원 회복·살리기</li></ul>`, art: () => ["sling","shield","scroll","lamp","staff","harp"].map(ultFig) },
+  { h: "⬆ 레벨업 강화 카드", t: `경험치를 모으면 레벨업! 그때마다 <b>카드 3장 중 하나</b>를 골라 강해집니다. <b>상자</b>를 열면 더 좋은 카드가 나와요.<ul><li>❤ 튼튼한 몸 · ⚔ 날카로운 검 · 🛡 두꺼운 갑옷 · 💧 생명수</li><li>🔥 불 같은 열심 · ⚡ 준비된 마음 · 👟 날쌘 발 · 🕯 지혜 · ⏳ 침착함 · 🍞 만나</li></ul>레벨이 오르면 외형도 양치기 → 용사 → 백부장 → 천부장 → 사사 → 왕으로 바뀝니다.`, art: () => [0,1,2,3,4,5].map(tierFig) },
+  { h: "🎯 지물마다 궁극기", t: `한 번 쓰면 <b>1분 뒤</b> 다시 채워집니다 (뒤처진 친구는 더 빨리).<ul><li>🎯 물맷돌 — 다음 공격 피해 2배, <b>높은 레벨일수록 더 세게</b></li><li>🛡 방패 — 회복 + 받는 공격 한 번 막기 · 📜 두루마리 — 주변 적 모두에게 문제</li><li>🕯 등불 — 3번 동안 오답 2개 삭제 · 🌊 지팡이 — 밀어내고 8초 무적</li><li>🎵 수금 — 크게 회복, 팀원 회복·살리기</li></ul>`, art: () => ["sling","shield","scroll","lamp","staff","harp"].map(ultFig) },
   { h: "🤝 팀전 · 🙏 중보기도", t: `<b>팀전</b>: 홍수 단계에서 팀원이 쓰러지면 22초 안에 곁으로 가세요. 문제를 맞히면 살려 낼 수 있어요 (한 사람당 한 번).<br><br><b>탈락해도 끝이 아닙니다!</b> 살아남은 친구를 골라 문제 3개를 맞히면 그 친구에게 <b>🙏 기도 방패</b>가 갑니다.`, art: () => [rnd(2), rnd(3)] },
-  { h: "☠ 보스 · 🦊 미니언", t: `<b>보스</b>는 어려운 문제 — 이기면 체력 30% 회복 + <b>궁극기 즉시 충전</b>, 틀리면 크게 다칩니다.<br><b>미니언</b>은 쉬운 문제 — 맞히면 경험치와 약간의 회복, 틀려도 손해 없음. 🔑 열쇠를 떨어뜨립니다.`, art: () => [bossFig("goliath"), bossFig("lion"), minFig("fox"), minFig("soldier")] },
-  { h: "📦 상자 · ⛪ 거점", t: `<ul><li><b>나무 상자</b> 2.5초 서 있기 · <b>금테</b> 자물쇠 퀴즈 · <b>보라·황금</b> 🔑 열쇠</li><li>🍞 만나(회복) · 🛡 방패 · ✨ 두 배 · 🕯 등불 · 👟 가속 · ☁ 은신 · 👑 왕관</li><li><b>거점</b>(성전·제단·우물·망대·샘)에 머물면 체력이 차고 경험치를 얻습니다</li></ul>`, art: () => [chestFig(0),chestFig(1),chestFig(2),chestFig(3)] },
+  { h: "☠ 보스 · 🦊 미니언", t: `<b>보스</b>는 닿거나 공격 버튼으로 대결 — 어려운 문제. 이기면 체력 30% 회복 + <b>궁극기 즉시 충전</b>, 틀리면 크게 다칩니다.<br><b>미니언</b>은 곁에 사람이 없을 때 공격 버튼으로 — 쉬운 문제, 맞히면 경험치와 약간의 회복, 가끔 🔑 열쇠. 먼저 덤비지 않아요.`, art: () => [bossFig("goliath"), bossFig("lion"), minFig("fox"), minFig("soldier")] },
+  { h: "📦 상자 = 강화 카드", t: `<ul><li>상자를 열면 <b>강화 카드 3장 중 1장</b>을 골라요!</li><li><b>나무</b> 2.5초 서 있기 → 일반 · <b>금테</b> 자물쇠 퀴즈 → <b>희귀</b> · <b>전설</b> 🔑 열쇠 → <b>전설 카드만</b></li><li>전설: ⚔ 골리앗의 칼 · 🛡 전신갑주 · 🌳 생명나무 열매 · 🔥 엘리야의 불 · 👑 솔로몬의 지혜 · 🕊 성령 충만</li><li><b>거점</b>(성전·제단·우물·망대·샘)에 머물면 체력이 차고 경험치를 얻습니다</li></ul>`, art: () => [chestFig(0),chestFig(1),chestFig(2),chestFig(3)] },
   { h: "👑 현상금 · 🗺 구역", t: `가장 많이 쓰러뜨린 사람에겐 <b>👑 왕관</b> — 쓰러뜨리면 체력 40% 회복 + 경험치 2배!<br><br>구역마다 문제 종류가 달라요: <b>에덴 동산·시내산</b> 구약 · <b>광야</b> 넌센스 · <b>갈릴리</b> 신약 · <b>예루살렘</b> 인물 · <b>바벨론</b> 어려움`, art: () => [rnd(5), rnd(4)] },
 ];
 function figCanvas(draw, label){ const w = document.createElement("div"); w.className = "fig"; const c = document.createElement("canvas"); c.width = c.height = 86; w.appendChild(c); w.appendChild(document.createTextNode(label)); w._draw = () => draw(c); return w; }
@@ -582,7 +583,7 @@ function hiFig(c){ const h = PX.hiCanvas(c, 86, 86); h.g.clearRect(0, 0, h.W, h.
 function minFig(k){ const M = PX.MINION[k]; return figCanvas((c) => PX.drawMinion(hiFig(c), 43, 76, 52, k, ((Date.now()/220)|0) % 2, false), M.name); }
 function ultFig(cls){ const k = PX.ITEMS.findIndex(x => x.id === cls), it = PX.ITEMS[k]; const lk = { sk: (k * 2) % 5, hs: k % 6, hc: (k * 3) % 10, ft: k % 6, cc: (k * 2 + 1) % 12, gr: k % 6, ac: k % 8, it: k, tier: 2 };
   return figCanvas((c) => PX.portrait(c, 86, 86, lk, { frame: PX.animFrame(false, 0, Date.now() + k * 170) }), it.uicon + " " + it.ult); }
-function chestFig(t){ const n = ["나무 · 2.5초","금테 · 퀴즈","전설 · 열쇠","황금 · 열쇠"]; return figCanvas((c) => PX.drawChest(hiFig(c), 43, 50, 60, t, ((Date.now()/700)|0) % 2 ? .6 : 0), n[t]); }
+function chestFig(t){ const n = ["나무 · 일반","금테 · 희귀","전설 · 전설","보물 · 전설"]; return figCanvas((c) => PX.drawChest(hiFig(c), 43, 50, 60, t, ((Date.now()/700)|0) % 2 ? .6 : 0), n[t]); }
 let tutIdx = 0, tutT0 = Date.now(), tutFigs = [];
 const TUT_MS = 9000;
 function showTut(i){
@@ -660,7 +661,7 @@ function sync(w){
   // 새 대결이 붙으면 그 자리에 불꽃
   const nowD = new Set(w.d.map(d => d[7]));
   w.d.forEach(d => {
-    if (prevDuels.has(d[7])) return;
+    if (prevDuels.has(d[7]) || d[9]) return;
     const s = VW / (MAPI ? MAPI.W : 1);
     spark((d[0]+d[2])/2*s, (d[1]+d[3])/2*s, d[8] ? "#FF5C6C" : "#B39CFF", 16, 3);
     SFX.play(d[8] ? "boss" : "duel");
@@ -777,6 +778,11 @@ function handleFx(list){
     } else if (f.k === "pray") {
       doves.push({ x: f.x, y: f.y, t0: now });
       SFX.play("pray");
+    } else if (f.k === "hit") {                                      // 공격 명중: 공격자 → 표적으로 빛이 날아감
+      if (bolts.length > 30) bolts.shift();
+      bolts.push({ u: f.u, v: f.v, x1: f.x1, y1: f.y1, x2: f.x2, y2: f.y2, t0: now, crit: f.crit, ko: f.ko, block: f.block,
+                   c: f.block ? "#78BEFF" : f.crit ? "#FF9A3C" : "#FFE27A" });
+      if (now - lastHitSfx > 170) { lastHitSfx = now; SFX.play("hit"); }
     }
   });
 }
@@ -860,8 +866,21 @@ function draw(){
     cx.beginPath(); cx.ellipse(x, y + 8, 12, 5, 0, 0, 7); cx.fillStyle = M.color + "55"; cx.fill();
     PX.drawMinion(cx, x, y + 8, 26, a[3], PX.animFrame(true, a[4], t), a[5] < 0); });
   // 대결선
+  const aims = [];
   Wd.d.forEach(d => {
     const on = d[7] === (Wd.feat && Wd.feat.id);
+    if (d[9]) {                                                       // 공격: 공격자 → 표적 빨간 점선 (과녁·남은 초는 캐릭터 위에)
+      const va = view.get(d[4]), vt = view.get(d[5]);
+      const ax = (va ? va.x : d[0]) * s, ay = (va ? va.y : d[1]) * s, bx = (vt ? vt.x : d[2]) * s, by = (vt ? vt.y : d[3]) * s;
+      const col = on ? "255,209,102" : "255,92,108", zk = 1 / Math.pow(cam.z, .45);
+      cx.save();
+      cx.setLineDash([8 * zk, 6 * zk]); cx.lineDashOffset = -t / 30;
+      cx.strokeStyle = `rgba(${col},${.55 + .3 * Math.sin(t / 120)})`; cx.lineWidth = (on ? 3.5 : 2.4) * zk;
+      cx.beginPath(); cx.moveTo(ax, ay); cx.lineTo(bx, by); cx.stroke();
+      cx.restore();
+      aims.push({ ax, ay, bx, by, col, on, sec: d[6] });
+      return;
+    }
     [[d[0],d[1]],[d[2],d[3]]].forEach(([bx,by]) => {
       const rr = 22 + Math.sin(t/150 + bx) * 3;
       cx.beginPath(); cx.arc(bx*s, by*s, rr, 0, 7);
@@ -960,6 +979,22 @@ function draw(){
     cx.globalAlpha = 1;
   });
 
+  // 공격 과녁: 노려지는 사람 위에 돌아가는 과녁 + 공격한 사람 곁에 남은 초
+  aims.forEach(m => {
+    const rr = size * .6 + Math.sin(t / 140) * 2, ang = t / 480;
+    cx.save();
+    cx.strokeStyle = `rgba(${m.col},.95)`; cx.lineWidth = m.on ? 3 : 2.2;
+    cx.beginPath(); cx.arc(m.bx, m.by, rr, 0, 7); cx.stroke();
+    for (let k = 0; k < 4; k++) { const a = ang + k * Math.PI / 2;
+      cx.beginPath(); cx.moveTo(m.bx + Math.cos(a) * (rr - size * .16), m.by + Math.sin(a) * (rr - size * .16)); cx.lineTo(m.bx + Math.cos(a) * (rr + size * .18), m.by + Math.sin(a) * (rr + size * .18)); cx.stroke(); }
+    const fz = Math.max(11, size * .3), lx = m.ax + size * .55, ly = m.ay - size * .1;
+    cx.font = `700 ${fz.toFixed(1)}px Pretendard, system-ui`; cx.textAlign = "center"; cx.textBaseline = "middle";
+    const tw = cx.measureText("🎯" + m.sec).width + fz * .8;
+    cx.fillStyle = "rgba(10,7,19,.85)"; cx.beginPath(); cx.roundRect(lx - tw / 2, ly - fz * .75, tw, fz * 1.5, fz * .75); cx.fill();
+    cx.fillStyle = m.on ? "#FFD166" : "#FF8A95"; cx.fillText("🎯" + m.sec, lx, ly + 1);
+    cx.restore();
+  });
+
   // 연출: 궁극기 파동 · 부활 빛기둥 · 기도 비둘기
   for (let i = rings.length - 1; i >= 0; i--) { const r = rings[i], k = (t - r.t0) / r.ms;
     if (k >= 1) { rings.splice(i, 1); continue; }
@@ -979,6 +1014,25 @@ function draw(){
     cx.globalAlpha = k > .8 ? (1 - k) / .2 : 1;
     cx.fillText("🕊", d.x * s + Math.sin(k * 10) * 12, d.y * s - 50 - 170 * Math.pow(1 - k, 1.4)); }
   cx.globalAlpha = 1;
+  for (let i = bolts.length - 1; i >= 0; i--) { const b = bolts[i], k = (t - b.t0) / 560;
+    if (k >= 1) { bolts.splice(i, 1); continue; }
+    const va = view.get(b.u), vt = view.get(b.v);
+    const x1 = (va ? va.x : b.x1) * s, y1 = (va ? va.y : b.y1) * s - 6, x2 = (vt ? vt.x : b.x2) * s, y2 = (vt ? vt.y : b.y2) * s - 6;
+    const fly = Math.min(1, k / .42), tail = Math.max(0, fly - .38);
+    const hx = x1 + (x2 - x1) * fly, hy = y1 + (y2 - y1) * fly - Math.sin(fly * Math.PI) * 14;
+    const tx = x1 + (x2 - x1) * tail, ty = y1 + (y2 - y1) * tail - Math.sin(tail * Math.PI) * 14;
+    if (fly < 1) {
+      cx.globalAlpha = 1; cx.strokeStyle = b.c; cx.lineWidth = b.crit ? 5 : 3.5; cx.lineCap = "round";
+      cx.beginPath(); cx.moveTo(tx, ty); cx.lineTo(hx, hy); cx.stroke();
+      cx.fillStyle = "#FFFFFF"; cx.beginPath(); cx.arc(hx, hy, b.crit ? 5 : 3.6, 0, 7); cx.fill(); cx.lineCap = "butt";
+    } else {
+      if (!b.hit) { b.hit = 1; spark(x2, y2, b.c, b.ko ? 20 : b.crit ? 14 : 8, b.ko ? 3.4 : 2.6);
+        if (b.crit && !b.block) floatText(x2, y2 - 46, "🔥 치명타", "#FF9A3C");
+        if (b.block) floatText(x2, y2 - 38, "🛡 막음!", "#78BEFF"); }
+      const kk = (k - .42) / .58; cx.globalAlpha = Math.max(0, 1 - kk); cx.strokeStyle = b.c; cx.lineWidth = 3 * (1 - kk) + 1;
+      cx.beginPath(); cx.arc(x2, y2, 8 + (b.ko ? 40 : 24) * kk, 0, 7); cx.stroke();
+    }
+    cx.globalAlpha = 1; }
 
   // 파티클
   for (let i = parts.length - 1; i >= 0; i--) {
@@ -1016,7 +1070,7 @@ function updateCamera(s){
   if (wantDuel) {
     const d = Wd.d.find(x => x[7] === focusId);
     const pos = d ? { x:(d[0]+d[2])/2, y:(d[1]+d[3])/2 } : cam.lastDuelPos;
-    if (pos) { cam.lastDuelPos = pos; tx = pos.x; ty = pos.y; tz = 2.4; mode = "대결 중계"; }
+    if (pos) { cam.lastDuelPos = pos; tx = pos.x; ty = pos.y; tz = 2.4; mode = (Wd.feat ? Wd.feat.atk : Wd.reveal && Wd.reveal.atk) ? "🎯 공격 중계" : Wd.feat && Wd.feat.boss || Wd.reveal && Wd.reveal.boss ? "☠ 보스 중계" : "대결 중계"; }
   } else if (cam.follow != null && view.has(cam.follow)) {
     const v = view.get(cam.follow); tx = v.x; ty = v.y; tz = 2.0;
     const info = roster.get(cam.follow); mode = (info ? info.n : "") + " 추적";
@@ -1088,7 +1142,7 @@ function updateBar(){
   // 상황에 맞는 배경음악
   const want = lob || Wd.ph === "ended" ? "lobby"
              : judge || (Wd.feat && Wd.feat.boss) ? "boss"
-             : Wd.d.length >= 3 || Wd.stg === "flood" ? "duel" : "play";
+             : Wd.stg === "flood" ? "duel" : "play";               // 공격은 늘 여러 개라 음악은 단계로만 바꿈
   if (want !== lastPh) { lastPh = want; SFX.music(want); }
   if (Wd.ph === "playing") {
     SFX.setIntensity(judge ? 1.3 : Wd.t <= 30 ? 1.3 : Wd.t <= 60 ? 1.18 : Wd.stg === "flood" ? 1.1 : 1);
@@ -1186,7 +1240,7 @@ function renderJudge(j){
 let castKey = "";
 function castSide(el, p, boss, reveal, flip){
   el.innerHTML = "";
-  el.className = "fighter" + (reveal ? (p && p.ok ? " ok" : p ? " no" : "") : "");
+  el.className = "fighter" + (reveal ? (p && p.target ? (p.taken > 0 || p.down ? " no" : " ok") : p && p.ok ? " ok" : p ? " no" : "") : "");
   if (!p) return;
   if (MODE !== "solo" && TEAMS[p.team]) { const t = document.createElement("div"); t.className = "tm"; t.style.background = TEAMS[p.team].color; el.appendChild(t); }
   const c = document.createElement("canvas");
@@ -1200,14 +1254,16 @@ function castSide(el, p, boss, reveal, flip){
   }
   const st = document.createElement("div"); st.className = "st";
   if (reveal && !boss) {
-    st.textContent = p.ok ? "정답!" : p.picked >= 0 ? "오답" : "미제출"; st.style.color = p.ok ? "var(--green)" : "var(--red)";
+    if (p.target) { st.textContent = "🎯 표적"; st.style.color = "var(--dim)"; }
+    else { st.textContent = p.ok ? "정답!" : p.picked >= 0 ? "오답" : "미제출"; st.style.color = p.ok ? "var(--green)" : "var(--red)"; }
     const dm = document.createElement("div"); dm.className = "dm";
-    dm.textContent = p.down ? "💥 쓰러짐!" : p.taken > 0 ? "−" + p.taken : p.dealt > 0 ? "공격 성공" : "";
+    dm.textContent = p.down ? "💥 쓰러짐!" : p.taken > 0 ? "−" + p.taken : p.target ? "무사!" : p.dealt > 0 ? "공격 성공" : "";
     dm.style.color = p.down || p.taken > 0 ? "var(--red)" : "var(--gold)";
     el.appendChild(st); if (dm.textContent) el.appendChild(dm);
     return;
   }
   if (reveal) { st.textContent = ""; }
+  else if (!boss && p.target) { st.textContent = "🏃 노려지는 중!"; st.style.color = "var(--red)"; }
   else if (!boss) { st.textContent = p.done ? "제출 완료" : "고민 중…"; st.style.color = p.done ? "var(--gold)" : "var(--dim)"; }
   el.appendChild(st);
 }
@@ -1217,11 +1273,13 @@ function renderCast(f, rv){
   if (Wd && Wd.stg === "judge") { box.classList.remove("on"); castKey = ""; return; }   // 심판 중엔 심판 판만
   if (rv) {
     box.classList.add("on");
-    $("cast-left").textContent = rv.boss ? (rv.winner ? rv.winner + " 승!" : "") : rv.winner ? rv.winner + " 먼저 맞힘!" : "둘 다 빗나감";
+    document.querySelector("#cast .vsbig").textContent = rv.atk ? "🎯" : "VS";
+    const AR = { hit: "명중!", ko: "쓰러뜨렸다!", far: "정답! 하지만 도망쳤다", gone: "정답! 그사이 다른 사람이 쓰러뜨림", dodge: "회피당했다!", block: "방패에 막혔다!", immune: "무적이라 무효", wrong: "오답 — 빗나감", timeout: "시간 초과" };
+    $("cast-left").textContent = rv.atk ? (AR[rv.atk] || "") : rv.boss ? (rv.winner ? rv.winner + " 승!" : "") : rv.winner ? rv.winner + " 먼저 맞힘!" : "둘 다 빗나감";
     const key = "R" + rv.id;
     if (key === castKey) return;
     castKey = key;
-    $("cast-tag").textContent = (rv.boss ? "☠ " + (PX.BOSS[rv.boss] || PX.BOSS.goliath).name + " 전투 결과" : "⚔ 대결 결과") + (rv.ref ? " · " + rv.ref : "");
+    $("cast-tag").textContent = (rv.atk ? "🎯 공격 결과" : rv.boss ? "☠ " + (PX.BOSS[rv.boss] || PX.BOSS.goliath).name + " 전투 결과" : "⚔ 대결 결과") + (rv.ref ? " · " + rv.ref : "");
     $("cast-q").textContent = rv.q;
     const ops = $("cast-ops"); ops.innerHTML = "";
     rv.options.forEach((o, i) => {
@@ -1245,8 +1303,9 @@ function renderCast(f, rv){
   if (key === castKey) return;
   const newDuel = !castKey.startsWith(f.id + "|");
   castKey = key;
+  document.querySelector("#cast .vsbig").textContent = f.atk ? "🎯" : "VS";
   if (newDuel) { box.classList.remove("enter"); void box.offsetWidth; box.classList.add("enter"); SFX.play(f.boss ? "roar" : "clash"); shake(f.boss ? 400 : 260); }
-  $("cast-tag").textContent = f.boss ? "☠ " + (PX.BOSS[f.boss] || PX.BOSS.goliath).name + " 전투" : "⚔ 대결 중계";
+  $("cast-tag").textContent = f.boss ? "☠ " + (PX.BOSS[f.boss] || PX.BOSS.goliath).name + " 전투" : f.atk ? "🎯 공격 중계 — 맞히는 순간 명중!" : "⚔ 대결 중계";
   $("cast-q").textContent = f.q;
   const ops = $("cast-ops"); ops.innerHTML = "";
   f.options.forEach((o, i) => {
@@ -1257,7 +1316,7 @@ function renderCast(f, rv){
     ops.appendChild(d);
   });
   castSide($("cast-a"), f.a, false, false, false);
-  castSide($("cast-b"), f.b, f.boss, false, true);
+  castSide($("cast-b"), f.atk && f.b ? { ...f.b, target: true } : f.b, f.boss, false, true);
 }
 $("cast-x").onclick = () => { goOverview(); $("cast").classList.remove("on"); };
 
@@ -1403,15 +1462,16 @@ function renderDuels(w){
   const key = w.d.map(d => d[7] + "-" + d[6]).join("|") + (w.feat ? "F" + w.feat.id : "");
   if (du.dataset.k === key) return;
   du.dataset.k = key;
-  $("dh").textContent = `진행 중인 대결 ${w.d.length}`;
+  const nAtk = w.d.filter(d => d[9]).length;
+  $("dh").textContent = nAtk === w.d.length ? `진행 중인 공격 ${w.d.length}` : `진행 중 — 🎯 공격 ${nAtk} · ☠ 보스 ${w.d.length - nAtk}`;
   du.innerHTML = "";
-  if (!w.d.length) { du.innerHTML = '<div style="color:var(--dim);font-size:11px">아직 대결이 없습니다</div>'; return; }
+  if (!w.d.length) { du.innerHTML = '<div style="color:var(--dim);font-size:11px">지금은 공격 중인 사람이 없습니다</div>'; return; }
   w.d.forEach(d => {
     const a = roster.get(d[4]), b = d[8] ? { n: (PX.BOSS[d[8]] || PX.BOSS.goliath).name } : roster.get(d[5]);
     const e = document.createElement("div");
     e.className = "du" + (w.feat && w.feat.id === d[7] ? " on" : "");
     e.innerHTML = `<span></span><span class="t">${d[6]}초</span>`;
-    e.firstChild.textContent = `${a?.n || "?"} ${d[8] ? "☠" : "⚔"} ${b?.n || "?"}`;
+    e.firstChild.textContent = `${a?.n || "?"} ${d[8] ? "☠" : d[9] ? "🎯" : "⚔"} ${b?.n || "?"}`;
     e.title = "클릭하면 크게 중계합니다";
     e.onclick = () => { socket.emit("host:feature", d[7]); cam.manualUntil = Date.now() + 60000; cam.follow = null; };
     du.appendChild(e);
