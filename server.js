@@ -40,18 +40,27 @@ const DUEL_TIME = 18, AFTER_DUEL = 4, CELL = 120;
 /* 문제가 길면 읽을 시간을 더 줍니다: 글자 60자당 +1초 (최대 +10초) */
 const readTime = (q) => Math.min(10, Math.round((q.text.length + q.options.join("").length) / 60));
 const DODGE_COOL = 40000, DODGE_TIME = 3200;
+const dodgeCool = (p) => DODGE_COOL * (p.cls === "staff" ? .6 : 1);   // 지팡이 특성: 회피를 더 자주 (24초마다)
 const CAP_PERIOD = 8000, BOSS_RESPAWN = 30000;
 const TREASURE_FIRST = 150000, TREASURE_EVERY = 240000;
 
 /* ═════════ 서바이벌 규칙 (숫자는 봇 시뮬레이션으로 맞춘 값) ═════════ */
-const HP0 = 100, ATK0 = 20;             // 처음 체력·공격력
+const HP0 = 120, ATK0 = 20;             // 처음 체력·공격력 (공격 버튼 전투는 자주 맞으니 체력을 넉넉히)
 const HIT_CAP = .35;                    // 한 번에 최대 체력의 35%까지만 깎임 (한 방에 끝나지 않게)
 const ULT_CAP = .55;                    // 궁극기로 맞힐 때는 55%까지
 const FIRST_BONUS = 1.25;               // 둘 다 맞혔을 때 먼저 맞힌 쪽 피해 +25%
 const COUNTER_MS = 5000;                // 먼저 맞힌 뒤, 상대가 5초 안에 맞히면 반격
 const LV_BONUS = .08, LV_BONUS_MAX = .4;// 나보다 레벨 높은 상대를 때리면 레벨 차 1당 +8% (최대 +40%)
-const AMBUSH_MUL = 1.5;                 // 기습 성공 시 피해 1.5배
-const AMBUSH_LOCK = 1500;               // 기습당한 쪽이 답을 못 고르는 시간
+const AMBUSH_MUL = 1.5;                 // 수풀·은신에서 공격하면 피해 1.5배 (상대에게 경고도 안 뜸)
+const AMBUSH_LOCK = 1500;
+/* 공격 버튼 전투: 가까운 적에게 '공격' → 내 폰에만 문제 → 맞히는 순간 바로 피해. 상대는 멈추지 않습니다 */
+const ATTACK_RANGE = 150;               // 공격 버튼이 켜지는 거리 (약 4칸)
+const ATTACK_HOLD = 400;                // 문제를 푸는 동안 상대가 이보다 멀리 도망가면 놓침
+const ATTACK_Q = 8, ATTACK_READ = 4;    // 공격 문제 8초 (+긴 문제는 최대 4초 더)
+const ATK_CD_HIT = 1200, ATK_CD_MISS = 2500;  // 공격이 끝난 뒤 다음 공격까지
+const QUICK_MS = 4000, QUICK_MUL = 1.2; // 4초 안에 맞히면 피해 1.2배
+const AMBUSH_RANGE = 90;                // 수풀에 숨은 적은 이만큼 가까워야 보이고 공격 가능
+const DISC_TARGET_MS = 20000;           // 연결이 끊긴 지 20초가 지나면 공격받을 수 있음
 const REGEN_DELAY = 8000, REGEN_RATE = .006;   // 성장 단계: 8초 동안 안 맞으면 초당 0.6% 회복 (홍수부터는 자연 회복 없음)
 const CAP_HEAL = .03;                   // 거점(성전 등) 안: 초당 3% 회복
 const REVIVE_NEED = 2, REVIVE_MIN_MS = 4000, REVIVE_HP = .6;   // 성장 단계 부활: 2문제
@@ -63,12 +72,12 @@ const GROW_END = .5;                    // 게임 시간의 앞 절반은 성장
 /* 홍수: 게임 시간 비율 at 에 차오르기 시작해 dur 동안 반지름 r(처음 대비)까지 줄어듭니다. 물속 피해는 초당 dps */
 /* fight = 그 단계의 대결 피해 배율 (물이 차오를수록 싸움이 격해짐) */
 const FLOOD = [
-  { at: .50, dur: .10, r: .55, dps: .03, fight: 1.3 },
-  { at: .66, dur: .10, r: .30, dps: .05, fight: 1.5 },
-  { at: .81, dur: .08, r: .13, dps: .08, fight: 1.8 },
+  { at: .50, dur: .10, r: .55, dps: .03, fight: 1.2 },
+  { at: .66, dur: .10, r: .30, dps: .05, fight: 1.4 },
+  { at: .81, dur: .08, r: .13, dps: .08, fight: 1.7 },
   { at: .93, dur: .07, r: .06, dps: .12, fight: 2.0 },     // 마지막 물결: 방주가 끝까지 조금씩 좁아짐
 ];
-const fightMul = () => G.stage === "grow" ? 1 : ((G.floodPlan[G.floodIdx] || FLOOD[0]).fight || 1.3);
+const fightMul = () => G.stage === "grow" ? 1 : ((G.floodPlan[G.floodIdx] || FLOOD[0]).fight || 1.2);
 const JUDGE_Q = 14, JUDGE_GAP = 4500, JUDGE_MAX = 10;   // 최후의 심판: 문제 14초, 결과 4.5초, 최대 10라운드
 const JUDGE_TEAM_MAX = 3;                        // 팀전 심판은 3라운드 — 그 뒤엔 더 많이 살아남은 팀이 우승
 const rematchMs = () => (G.stage === "grow" ? 18000 : G.floodIdx >= 2 ? 5000 : 8000);
@@ -93,8 +102,8 @@ const TIER_TABLE = [
 const BOSSES = {                        // 보스전: 어려운 문제만 · 시간 짧음 · 틀리면 체력이 크게 깎임
   // 골리앗: 6초마다 돌진(3배속 1초). 정면으로 마주치면 못 피합니다
   goliath:   { name: "골리앗",     speed: 50, reward: 3, penalty: 1, limit: 14, trait: "돌진",   desc: "6초마다 무섭게 돌진합니다" },
-  // 바로 왕: 거점(성전·제단·우물)을 순찰하며 지킵니다. 쓰러뜨리면 만나 상자를 떨어뜨립니다
-  pharaoh:   { name: "바로 왕",    speed: 42, reward: 4, penalty: 1, limit: 13, trait: "거점 순찰", desc: "거점을 지키고, 쓰러지면 만나 상자를 남깁니다" },
+  // 바로 왕: 거점(성전·제단·우물)을 순찰하며 지킵니다. 쓰러뜨리면 금테 상자를 떨어뜨립니다
+  pharaoh:   { name: "바로 왕",    speed: 42, reward: 4, penalty: 1, limit: 13, trait: "거점 순찰", desc: "거점을 지키고, 쓰러지면 금테 상자(희귀 카드)를 남깁니다" },
   // 바벨론 사자: 가장 빠르고 수풀에 숨습니다. 수풀 근처에선 조심
   lion:      { name: "바벨론 사자", speed: 80, reward: 2, penalty: 1, limit: 12, trait: "잠복",   desc: "수풀에 숨어 있다가 덮칩니다" },
   // 리워야단: 물 위를 다닙니다. 호수 근처가 위험. 후반에 한 번만
@@ -104,7 +113,7 @@ const BOSSES = {                        // 보스전: 어려운 문제만 · 시
   // 헤롯: 8초마다 아무 사람 옆으로 순간이동
   herod:     { name: "헤롯 왕",    speed: 40, reward: 3, penalty: 1, limit: 13, trait: "순간이동", desc: "8초마다 누군가의 옆으로 순간이동합니다" },
   // 에덴의 뱀: 지면 아이템을 모두 빼앗깁니다
-  serpent:   { name: "에덴의 뱀",  speed: 58, reward: 3, penalty: 1, limit: 13, trait: "유혹",   desc: "지면 갖고 있던 아이템을 전부 빼앗깁니다" },
+  serpent:   { name: "에덴의 뱀",  speed: 58, reward: 3, penalty: 1, limit: 13, trait: "유혹",   desc: "지면 궁극기를 빼앗겨 처음부터 다시 채워야 합니다" },
   // 아말렉 병사: 둘씩 무리로 등장
   amalek:    { name: "아말렉 병사", speed: 68, reward: 1, penalty: 1, limit: 11, trait: "무리",   desc: "둘씩 몰려다닙니다. 약하지만 빠릅니다" },
 };
@@ -119,7 +128,7 @@ const TIERS = [
 ];
 const tierIdx = (lv) => { let k = 0; TIERS.forEach((t, i) => { if ((lv || 1) >= t.lv) k = i; }); return k; };
 const XP_TABLE = [0, 50, 110, 180, 260, 350, 450, 560, 680, 810];    // 레벨 1~10 누적 경험치
-const XP = { hit: 18, kill: 40, miss: 4, hurt: 5, boss: 90, soldier: 15, fox: 30, locust: 10, chest: 12, cap: 8, quest: 30, treasure: 80, revive: 5, teamrev: 25, sermon: 12, saved: 8 };
+const XP = { hit: 12, kill: 40, miss: 2, hurt: 5, boss: 90, soldier: 15, fox: 30, locust: 10, chest: 12, cap: 8, quest: 30, treasure: 80, revive: 5, teamrev: 25, sermon: 12, saved: 8 };
 const levelOf = (xp) => { let l = 1; for (let i = 1; i < XP_TABLE.length; i++) if (xp >= XP_TABLE[i]) l = i + 1; return l; };
 
 /* 레벨업 강화 카드 — 레벨이 오를 때마다 3장 중 1장을 고릅니다 */
@@ -131,24 +140,38 @@ const CARDS = [
   { id: "crit",  icon: "🔥", name: "불 같은 열심", desc: "30% 확률로 피해 1.6배", max: 2 },
   { id: "ult",   icon: "⚡", name: "준비된 마음", desc: "궁극기 대기 시간 −10초", max: 3 },
   { id: "speed", icon: "👟", name: "날쌘 발",     desc: "이동 속도 +10%", max: 2 },
-  { id: "wis",   icon: "🕯", name: "지혜",       desc: "대결마다 25% 확률로 오답 하나가 지워짐", max: 2 },
-  { id: "time",  icon: "⏳", name: "침착함",     desc: "대결 시간 +3초", max: 2 },
+  { id: "wis",   icon: "🕯", name: "지혜",       desc: "문제마다 25% 확률로 오답 하나가 지워짐", max: 2 },
+  { id: "time",  icon: "⏳", name: "침착함",     desc: "문제 푸는 시간 +3초", max: 2 },
   { id: "heal",  icon: "🍞", name: "만나",       desc: "체력을 모두 회복", max: 99, low: true },
+  // ── 희귀 카드: 금테 상자 ──
+  { id: "hp2",    icon: "💗", name: "강한 몸",        desc: "최대 체력 +35 (바로 35 회복)", max: 3, tier: 1 },
+  { id: "atk2",   icon: "🗡", name: "예리한 칼",      desc: "공격력 +7", max: 3, tier: 1 },
+  { id: "def2",   icon: "🥉", name: "청동 갑옷",      desc: "받는 피해 −15%", max: 2, tier: 1 },
+  { id: "quick",  icon: "🏹", name: "빠른 손",        desc: "공격 대기 시간 절반 · 4초 안에 맞히면 피해 1.5배", max: 1, tier: 1 },
+  { id: "manna2", icon: "🧺", name: "만나 광주리",    desc: "체력 모두 회복 + 기도 방패 20%", max: 99, tier: 1 },
+  { id: "wind",   icon: "🌬", name: "성령의 바람",    desc: "궁극기 바로 충전", max: 99, tier: 1 },
+  // ── 전설 카드: 전설 상자·숨겨진 보물 ──
+  { id: "sword",  icon: "⚔", name: "골리앗의 칼",      desc: "공격력 +12", max: 1, tier: 2 },
+  { id: "armor",  icon: "🛡", name: "하나님의 전신갑주", desc: "받는 피해 −25%", max: 1, tier: 2 },
+  { id: "tree",   icon: "🌳", name: "생명나무 열매",    desc: "최대 체력 +60, 체력 모두 회복", max: 1, tier: 2 },
+  { id: "fire",   icon: "🔥", name: "엘리야의 불",      desc: "공격할 때 25% 확률로 피해 2배", max: 1, tier: 2 },
+  { id: "wisdom", icon: "👑", name: "솔로몬의 지혜",    desc: "모든 문제에서 오답 하나가 늘 지워짐", max: 1, tier: 2 },
+  { id: "spirit", icon: "🕊", name: "성령 충만",        desc: "궁극기 대기 시간 절반 + 바로 충전", max: 1, tier: 2 },
 ];
 const CARD = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 /* 특성(지물)마다 궁극기 하나 — 한 번 쓰면 1분 뒤 다시 준비 */
 const ULTS = {
-  sling:  { name: "다윗의 물맷돌", icon: "🎯", desc: "다음 대결에서 맞히면 피해 2배 — 상대 레벨이 나보다 높을수록 더 세집니다", arm: true },
-  shield: { name: "믿음의 방패",   icon: "🛡", desc: "체력 25% 회복 + 다음 대결에서 받는 피해를 모두 막습니다" },
+  sling:  { name: "다윗의 물맷돌", icon: "🎯", desc: "30초 안에 하는 다음 공격을 맞히면 피해 2배 — 상대 레벨이 나보다 높을수록 더 세집니다", arm: true },
+  shield: { name: "믿음의 방패",   icon: "🛡", desc: "체력 25% 회복 + 25초 안에 받는 공격 한 번을 막습니다" },
   scroll: { name: "말씀 선포",     icon: "📜", desc: "주변 적 모두에게 문제를 냅니다 — 틀린 사람은 모두 피해" },
-  lamp:   { name: "지혜의 빛",     icon: "🕯", desc: "다음 대결 3번 동안 오답 보기 2개가 지워집니다", arm: true },
+  lamp:   { name: "지혜의 빛",     icon: "🕯", desc: "다음 문제 3번 동안 오답 보기 2개가 지워집니다 (심판 제외)", arm: true },
   staff:  { name: "홍해 가르기",   icon: "🌊", desc: "주변 적을 밀어내고 8초 동안 무적 + 빠른 이동 (홍수 피해도 없음)" },
   harp:   { name: "다윗의 수금",   icon: "🎵", desc: "체력 45% 회복 · 팀전이면 주변 팀원도 회복하고 쓰러진 팀원을 일으킵니다" },
 };
 const QUESTS = [                        // 도전과제 — 달성하면 경험치 +30
-  { id: "hit1",   name: "첫 명중",     need: 1, desc: "대결에서 정답으로 상대를 맞히기" },
-  { id: "duel5",  name: "전사의 길",   need: 5, desc: "대결 5회 참여" },
-  { id: "streak3",name: "연속 명중",   need: 3, desc: "대결에서 3번 연속 정답" },
+  { id: "hit1",   name: "첫 명중",     need: 1, desc: "공격 문제를 맞혀 상대를 명중시키기" },
+  { id: "attack5", name: "전사의 길",  need: 5, desc: "공격 5번 하기" },
+  { id: "streak3",name: "연속 명중",   need: 3, desc: "3번 연속 명중" },
   { id: "kill1",  name: "첫 승리",     need: 1, desc: "상대를 한 번 쓰러뜨리기" },
   { id: "boss1",  name: "거인 사냥꾼", need: 1, desc: "보스 1회 격파" },
   { id: "box5",   name: "보물 수집가", need: 5, desc: "상자 5개 열기" },
@@ -286,7 +309,7 @@ const now = () => (pauseStart || rawNow()) - pauseTotal;
 const later = (ms, f) => setTimeout(f, ms / TIME_SCALE);
 function pushLog(t, tone = "") { G.log.unshift({ t, tone }); if (G.log.length > 30) G.log.pop(); }
 function bigEvent(text, tone = "") { G.events.push({ text, tone }); if (G.events.length > 6) G.events.shift(); }
-function fx(o) { G.fx.push(o); if (G.fx.length > 24) G.fx.shift(); }
+function fx(o) { G.fx.push(o); if (G.fx.length > 40) G.fx.shift(); }
 
 function spawnBox() {
   // 후보 12곳 중 기존 상자·플레이어에서 가장 멀리 떨어진 곳을 고릅니다 (한곳에 몰리지 않게)
@@ -302,19 +325,18 @@ function spawnBox() {
   }
   const p = best || freeSpot(inside);
   const roll = Math.random();
-  const tier = roll < .06 ? 2 : roll < .35 ? 1 : 0;   // 나무 65% · 금테 29% · 전설 6%
-  const pool = TIER_TABLE[tier];
-  G.boxes.push({ id: G.nextBoxId++, x: p.x, y: p.y, type: pool[Math.random() * pool.length | 0], tier });
+  const tier = roll < .06 ? 2 : roll < .35 ? 1 : 0;   // 나무 65% · 금테 29% · 전설 6% — 열면 등급에 맞는 강화 카드
+  G.boxes.push({ id: G.nextBoxId++, x: p.x, y: p.y, tier });
 }
 /* 홍수가 차오르면 남은 땅 넓이에 맞춰 상자 수도 줄어듭니다 */
 const boxTarget = () => {
-  const base = Math.max(10, Math.min(30, Math.round(G.players.size * .4) + 6));
+  const base = Math.max(8, Math.min(22, Math.round(G.players.size * .3) + 4));   // 상자가 영구 강화라 예전보다 조금 적게
   if (G.stage === "grow" || !MAP) return base;
   const full = Math.hypot(MAP.W, MAP.H) / 2;
   return Math.max(3, Math.round(base * Math.min(1, (G.zone.r / full) ** 2 * 1.6)));
 };
 function refillBoxes() { while (G.boxes.length < boxTarget()) spawnBox(); }
-const BOX_RESPAWN = 12000;              // 먹힌 뒤 12초에 하나씩만 다시 생김
+const BOX_RESPAWN = 15000;              // 먹힌 뒤 15초에 하나씩만 다시 생김
 
 function regionOf(y, x) { return ZONES[zoneOf(x == null ? MAP.W / 2 : x, y)].cat; }
 function pickQuestion(a, b, region, hardOnly, easyOnly) {
@@ -369,7 +391,7 @@ function cleanName(raw) {
 function freshStats(p) {
   Object.assign(p, {
     st: "ok", hp: HP0, mhp: HP0, atk: ATK0, perk: {}, guard: p.cls === "shield" ? 2 : 0,
-    lastHurt: 0, downAt: 0, bleedUntil: 0, elimAt: 0, place: 0, killedBy: "", teamSaved: 0,
+    lastHurt: 0, downAt: 0, bleedUntil: 0, elimAt: 0, place: 0, killedBy: "", teamSaved: 0, atkCool: 0, attacks: 0,
     reviveGot: 0, reviveNext: 0, revNext: 0,
     ultReady: 0, ultArm: null, ultArmUntil: 0, lampLeft: 0, ultShieldUntil: 0, immuneUntil: 0,
     prayShield: 0, prayCoolUntil: 0, prayTarget: null, prayPts: 0, prayOn: false, prayNext: 0,
@@ -395,7 +417,7 @@ function newPlayer(id, name, look) {
 const stk = (p, id) => (p.perk && p.perk[id]) || 0;
 const inGame = (p) => p.st === "ok" || p.st === "down" || p.st === "bleed";   // 아직 탈락하지 않음
 const fighting = (p) => p.st === "ok" && G.participants.has(p.id);              // 지금 싸울 수 있음
-const defMul = (p) => 1 - .1 * stk(p, "def");
+const defMul = (p) => Math.max(.4, (1 - .1 * stk(p, "def")) * (1 - .15 * stk(p, "def2")) * (stk(p, "armor") ? .75 : 1));   // 피해는 최대 60%까지만 줄어듦
 const hintChance = (p) => (p.cls === "lamp" ? .25 : 0) + .25 * stk(p, "wis");
 const hpPct = (p) => p.mhp ? Math.max(0, Math.min(100, Math.round(p.hp / p.mhp * 100))) : 0;
 const teamCount = () => (G.mode === "team4" ? 4 : G.mode === "team2" ? 2 : 0);
@@ -426,7 +448,7 @@ function isUnderdog(p) {
   const med = lv[lv.length >> 1];
   return (p.level || 1) <= Math.min(med - 1, lv[Math.floor(lv.length * .4)]);
 }
-const ultCdFor = (p) => (ULT_CD - 10000 * stk(p, "ult")) * (isUnderdog(p) ? .75 : 1);
+const ultCdFor = (p) => (ULT_CD - 10000 * stk(p, "ult")) * (isUnderdog(p) ? .75 : 1) * (stk(p, "spirit") ? .5 : 1);
 
 /* ═════════ 경험치 · 레벨업 카드 ═════════ */
 function addXp(p, n, why) {
@@ -449,37 +471,50 @@ function addXp(p, n, why) {
   }
   if (p.socketId && n >= 5) io.to(p.socketId).emit("xp", { n, why, xp: p.xp, level: p.level, next: XP_TABLE[Math.min(9, p.level)] || XP_TABLE[9], base: XP_TABLE[p.level - 1] });
 }
-function cardOptions(p) {
-  const pool = CARDS.filter((c) => stk(p, c.id) < c.max && (!c.low || p.hp < p.mhp * .7));
-  const weight = (c) => c.id === "hp" || c.id === "atk" ? 3 : c.id === "heal" ? 2.5 : 1.4;   // 체력·공격이 자주 나옴
-  const out = [], bag = pool.slice();
-  while (out.length < 3 && bag.length) {
-    const tot = bag.reduce((s, c) => s + weight(c), 0);
+function cardOptions(p, tier) {
+  const ok = (c) => stk(p, c.id) < c.max && (!c.low || p.hp < p.mhp * .7);
+  const pool = (tr) => CARDS.filter((c) => (c.tier || 0) === tr && ok(c));
+  const weight = (c) => c.id === "hp" || c.id === "atk" ? 3 : c.id === "heal" ? 2.5 : c.id === "manna2" || c.id === "wind" ? 1 : 1.4;   // 체력·공격이 자주 나옴
+  const plan = tier >= 2 ? [2, 2, 2] : tier === 1 ? [1, 1, 0] : [0, 0, 0];
+  const out = [];
+  for (const tr of plan) {
+    let bag = [];
+    for (let k = tr; k >= 0 && !bag.length; k--) bag = pool(k).filter((c) => !out.includes(c.id));   // 다 모았으면 한 등급 아래에서
+    if (!bag.length) continue;
+    const tot = bag.reduce((s2, c) => s2 + weight(c), 0);
     let r = Math.random() * tot, k = 0;
     for (; k < bag.length - 1; k++) { r -= weight(bag[k]); if (r <= 0) break; }
-    out.push(bag.splice(k, 1)[0].id);
+    out.push(bag[k].id);
   }
   return out;
 }
-function offerCards(p, level) {
-  const opts = cardOptions(p);
+/* src: "lv" 레벨업 · "box" 상자(tier 0 나무 · 1 금테 · 2 전설 · 3 보물) · "gift" 지각 선물 */
+function offerCards(p, level, src, tier) {
+  const opts = cardOptions(p, tier || 0);
   if (!opts.length) return;
-  p.pendingCards.push({ level, opts, until: 0 });
+  p.pendingCards.push({ level, opts, until: 0, src: src || "lv", tier: tier || 0 });
   if (p.pendingCards.length === 1) sendCards(p);
 }
 const CARD_MS = 12000;                  // 12초 안에 안 고르면 첫 번째 카드가 자동으로 골라집니다
 function sendCards(p) {
   const c = p.pendingCards[0]; if (!c) return;
   c.until = now() + CARD_MS;
-  if (p.socketId) io.to(p.socketId).emit("cards", { level: c.level, opts: c.opts.map((id) => CARD[id]), left: CARD_MS / 1000, more: p.pendingCards.length - 1 });
+  if (p.socketId) io.to(p.socketId).emit("cards", { level: c.level, opts: c.opts.map((id) => CARD[id]), left: CARD_MS / 1000 / TIME_SCALE, more: p.pendingCards.length - 1, src: c.src, tier: c.tier });
 }
 function applyCard(p, id, auto) {
   const c = p.pendingCards[0]; if (!c || !c.opts.includes(id)) return false;
   p.pendingCards.shift();
   p.perk[id] = stk(p, id) + 1;
-  if (id === "hp") { p.mhp += 20; if (p.st === "ok") p.hp = Math.min(p.mhp, p.hp + 20); }
+  const grow = (n) => { p.mhp += n; if (p.st === "ok") p.hp = Math.min(p.mhp, p.hp + n); };
+  if (id === "hp") grow(20);
+  else if (id === "hp2") grow(35);
+  else if (id === "tree") { grow(60); if (p.st === "ok") p.hp = p.mhp; }
   else if (id === "atk") p.atk += 4;
+  else if (id === "atk2") p.atk += 7;
+  else if (id === "sword") p.atk += 12;
   else if (id === "heal") { if (p.st === "ok") p.hp = p.mhp; }
+  else if (id === "manna2") { if (p.st === "ok") p.hp = p.mhp; p.prayShield = Math.max(p.prayShield || 0, Math.round(p.mhp * .2)); }
+  else if (id === "wind" || id === "spirit") p.ultReady = Math.min(p.ultReady, now());
   if (p.socketId) io.to(p.socketId).emit("cardOk", { card: CARD[id], auto: !!auto, hp: Math.round(p.hp), mhp: p.mhp, atk: p.atk });
   if (p.pendingCards.length) later(700, () => sendCards(p));
   return true;
@@ -497,6 +532,7 @@ const hitCap = (def, ult) => def.mhp * Math.min(.7, (ult ? ULT_CAP : HIT_CAP) * 
 function calcDamage(att, def, mul, ult) {
   let d = att.atk * mul, crit = false;
   if (stk(att, "crit") && Math.random() < .3 * stk(att, "crit")) { d *= 1.6; crit = true; }
+  if (stk(att, "fire") && Math.random() < .25) { d *= 2; crit = true; }
   const diff = (def.level || 1) - (att.level || 1);
   if (diff > 0) d *= 1 + Math.min(LV_BONUS_MAX, diff * LV_BONUS);
   d *= fightMul();
@@ -642,14 +678,17 @@ function armFor(d, p, q, kind) {
       hide = 2; p.lampLeft--; used.push("🕯 지혜의 빛" + (p.lampLeft ? ` (${p.lampLeft}번 남음)` : ""));
       if (!p.lampLeft) p.ultArm = null;
     }
+    if (stk(p, "wisdom") && hide < 1) { hide = 1; used.push("👑 솔로몬의 지혜"); }
   }
   const wrong = q.options.map((_, i) => i).filter((i) => i !== q.answer).sort(() => Math.random() - .5);
   d.hide[p.id] = wrong.slice(0, hide);
-  if (kind === "pvp" || kind === "boss") {
-    d.dbl[p.id] = kind === "pvp" && useItem(p, used, "double");
-    d.shield[p.id] = useItem(p, used, "shield");
-    if (!d.shield[p.id] && t < p.ultShieldUntil) { d.shield[p.id] = true; p.ultShieldUntil = 0; used.push("🛡 믿음의 방패"); }
-    if (kind === "pvp" && p.ultArm === "sling" && t < p.ultArmUntil) { d.sling[p.id] = true; p.ultArm = null; used.push("🎯 다윗의 물맷돌"); }
+  if (kind === "pvp" || kind === "boss" || kind === "attack") {
+    d.dbl[p.id] = kind !== "boss" && useItem(p, used, "double");
+    if (kind !== "attack") {
+      d.shield[p.id] = useItem(p, used, "shield");
+      if (!d.shield[p.id] && t < p.ultShieldUntil) { d.shield[p.id] = true; p.ultShieldUntil = 0; used.push("🛡 믿음의 방패"); }
+    }
+    if (kind !== "boss" && p.ultArm === "sling" && t < p.ultArmUntil) { d.sling[p.id] = true; p.ultArm = null; used.push("🎯 다윗의 물맷돌"); }
     if (useItem(p, used, "time")) d.plus = 6;
   }
   d.used[p.id] = used;
@@ -671,6 +710,24 @@ function startDuel(a, b, ambush) {
   G.duels.set(id, d);
   sendDuel(a, d); sendDuel(b, d);
   pushLog(ambush ? `🗡 ${a.name} 이(가) ${b.name}을(를) 기습!` : `${a.name} ⚔ ${b.name}`, ambush ? "hot" : "");
+}
+/* 공격: 공격하는 사람만 문제를 풉니다 (상대는 계속 움직임). 맞히는 순간 판정 */
+function startAttack(a, o) {
+  const q = pickQuestion(a, null, regionOf(a.y, a.x));
+  if (!q) return null;
+  const t = now(), id = G.nextDuelId++;
+  const ambush = stealth(a, t);
+  const d = { id, kind: "attack", a: a.id, b: null, target: o.id, q, region: regionOf(a.y, a.x), ...blankDuel(), ambush: ambush ? a.id : null, startAt: t };
+  armFor(d, a, q, "attack");
+  d.limit = ATTACK_Q + Math.min(ATTACK_READ, readTime(q)) + Math.min(4, duelBonusTime(a)) + (d.plus || 0) + (isUnderdog(a) ? 1 : 0);
+  d.endsAt = t + d.limit * 1000;
+  if (ambush) { a.ghostUntil = 0; a.ambushes = (a.ambushes || 0) + 1; }
+  a.duel = id; a.duelCount++; a.attacks++;
+  quest(a, "attack5");
+  G.duels.set(id, d);
+  sendDuel(a, d);
+  if (o.socketId && !ambush) io.to(o.socketId).emit("aimed", { u: numOf.get(a.id), name: a.name, left: d.limit / TIME_SCALE });
+  return d;
 }
 function startBossDuel(p, boss) {
   const q = pickQuestion(p, null, regionOf(p.y, p.x), true);
@@ -703,7 +760,7 @@ function startMinionDuel(p, m) {
   const M = MINIONS[m.type];
   const d = startSoloQuiz(p, "minion", { minion: m.type, minionId: m.id }, M.limit);
   if (!d) return;
-  m.busyUntil = now() + d.limit * 1000 + 300; p.minionCool = now() + d.limit * 1000 + 5000;   // 끝난 뒤 5초는 미니언과 안 붙음
+  m.busyUntil = now() + d.limit * 1000 + 300;
 }
 function startChestDuel(p, b) {
   const d = startSoloQuiz(p, "chest", { boxId: b.id }, 12);
@@ -714,7 +771,7 @@ function startChestDuel(p, b) {
 function startSermon(caster, targets) {
   const q = pickGroupQuestion(targets, false);
   if (!q) return 0;
-  const limit = 12 + readTime(q), endsAt = now() + limit * 1000;
+  const limit = 10 + readTime(q), endsAt = now() + limit * 1000;
   for (const p of targets) {
     const id = G.nextDuelId++;
     const d = { id, kind: "sermon", a: p.id, b: null, caster: caster.id, q, limit, endsAt, region: null, ...blankDuel() };
@@ -753,6 +810,7 @@ function sendDuel(p, d) {
   else if (pray) foeInfo = { ...card(pray), pray: true };
   let dealt = 0, risk = 0;
   if (d.kind === "pvp" && foe) { dealt = previewDamage(p, foe, d); risk = previewDamage(foe, p, d); }
+  if (d.kind === "attack" && tgt) dealt = previewDamage(p, tgt, d);
   if (d.kind === "boss") risk = d.shield[p.id] ? 0 : Math.round(p.mhp * bossDmgPct(d.boss) * defMul(p));
   if (d.kind === "sermon" && caster) risk = Math.round(Math.min(caster.atk * 1.3 * defMul(p), hitCap(p, false)));
   io.to(p.socketId).emit("duel", {
@@ -765,6 +823,7 @@ function sendDuel(p, d) {
     got: d.kind === "revive" ? p.reviveGot : d.kind === "pray" ? p.prayPts : 0,
     need: d.kind === "revive" ? REVIVE_NEED : d.kind === "pray" ? PRAY_NEED : 0,
     round: d.round || 0, alive: d.alive || 0,
+    quick: d.kind === "attack" ? QUICK_MS / 1000 / TIME_SCALE : 0, quickMul: d.kind === "attack" ? (stk(p, "quick") ? 1.5 : QUICK_MUL) : 0,
   });
 }
 function noteWrong(p, q, myChoice) {
@@ -813,10 +872,50 @@ function emitEnd(p, o) { if (p && p.socketId) io.to(p.socketId).emit("duelEnd", 
 function resolveDuel(d) {
   if (!G.duels.has(d.id)) return;
   G.duels.delete(d.id);
-  if (G.featured === d.id) G.featured = null;
+  if (G.featured === d.id) { G.featured = null; d.feat = true; }
   const res = resOf(d.q), t = now(), P = (id) => id && G.players.get(id);
   const pickOf = (p) => d.picks[p.id], okOf = (p) => !!(d.picks[p.id] && d.picks[p.id].correct);
 
+  if (d.kind === "attack") {
+    const a = P(d.a), o = P(d.target); if (!a) return;
+    if (a.duel === d.id) a.duel = null;
+    const pk = pickOf(a), ok = okOf(a);
+    let result = ok ? "hit" : pk ? "wrong" : "timeout", dealt = 0, crit = false, ko = false, quick = false, vamp = 0, absorbed = 0, sling = false;
+    if (ok) {
+      a.hits++; a.streak++; a.bestStreak = Math.max(a.bestStreak, a.streak);
+      quest(a, "hit1"); if (a.streak === 3) quest(a, "streak3", 3);
+      const alive = o && o.st === "ok" && G.participants.has(o.id);
+      if (!alive) result = "gone";                                   // 그사이 다른 사람이 쓰러뜨렸거나 탈락
+      else if (Math.hypot(o.x - a.x, o.y - a.y) > ATTACK_HOLD) result = "far";
+      else if (t < o.dodgeUntil) result = "dodge";
+      else if (t < o.immuneUntil || t < o.safeUntil) result = "immune";
+      else if (t < o.ultShieldUntil) { o.ultShieldUntil = 0; result = "block"; }
+      else {
+        let mul = 1;
+        quick = pk.at - d.startAt <= QUICK_MS;
+        if (quick) mul *= stk(a, "quick") ? 1.5 : QUICK_MUL;
+        if (d.ambush === a.id) mul *= AMBUSH_MUL;
+        if (d.dbl[a.id]) mul *= 2;
+        sling = !!d.sling[a.id]; if (sling) mul *= slingMul(a, o);
+        const c = calcDamage(a, o, mul, sling); crit = c.crit;
+        const r = hurt(o, c.dmg, a, "pvp");
+        dealt = r.taken; absorbed = r.absorbed; ko = r.down; result = ko ? "ko" : "hit";
+        if (r.taken > 0 && stk(a, "vamp")) vamp = Math.round(heal(a, r.taken * .3 * stk(a, "vamp")));
+        if (d.ambush === a.id && r.taken > 0) a.ambushHits++;
+        if (ko && sling) a.ultKills = (a.ultKills || 0) + 1;
+      }
+      addXp(a, result === "hit" || result === "ko" ? XP.hit : Math.round(XP.hit / 2), result === "hit" || result === "ko" ? "명중" : "정답");
+    } else { a.streak = 0; noteWrong(a, d.q, pk ? pk.choice : -1); addXp(a, XP.miss, ""); }
+    const cd = (ok ? ATK_CD_HIT : ATK_CD_MISS) * (stk(a, "quick") ? .5 : 1);
+    a.atkCool = t + cd;
+    emitEnd(a, { ...res, kind: "attack", result, dealt, crit, quick, ko, sling, vamp, absorbed, cd: cd / 1000 / TIME_SCALE,
+      name: o ? o.name : "", foeHp: o ? Math.round(o.hp) : 0, foeMhp: o ? o.mhp : 0, hp: Math.round(a.hp), mhp: a.mhp, streak: a.streak,
+      card: ok ? giveCard(a, d.q) : null, sticker: ko ? STICKERS[Math.random() * STICKERS.length | 0] : null });
+    if (o && o.socketId) io.to(o.socketId).emit("aimEnd", { u: numOf.get(a.id), name: a.name, result, dmg: dealt, crit, ko, absorbed, hp: Math.round(o.hp), mhp: o.mhp });
+    if (o && (dealt > 0 || ko || result === "block")) fx({ k: "hit", u: numOf.get(a.id), v: numOf.get(o.id), x1: a.x | 0, y1: a.y | 0, x2: o.x | 0, y2: o.y | 0, dmg: dealt, crit, ko, cls: a.cls, block: result === "block" });
+    if (d.feat && o) { showReveal(d, ok ? a.name : null, revealSide(d, a, { dealt, taken: 0 }), { ...revealSide(d, o, { dealt: 0, taken: dealt }), picked: -1, ok: false, target: true }); G.reveal.atk = result; }
+    return;
+  }
   if (d.kind === "minion") {
     const p = P(d.a); if (!p) return;
     p.duel = null; p.safeUntil = t + 1500;
@@ -914,7 +1013,7 @@ function resolveDuel(d) {
       bigEvent(`🏅 ${p.name} ${B.name} 격파!`, "gold");
       if (boss) {
         boss.dead = true; boss.respawnAt = t + (boss.type === "amalek" ? BOSS_RESPAWN_FAST : BOSS_RESPAWN);
-        if (boss.type === "pharaoh") { G.boxes.push({ id: G.nextBoxId++, x: boss.x, y: boss.y, type: "manna", tier: 1 }); pushLog("👑 바로 왕이 만나 상자를 떨어뜨렸습니다!", "gold"); }
+        if (boss.type === "pharaoh") { G.boxes.push({ id: G.nextBoxId++, x: boss.x, y: boss.y, tier: 1 }); pushLog("👑 바로 왕이 금테 상자를 떨어뜨렸습니다!", "gold"); }
       }
       showReveal(d, p.name, revealSide(d, p, null), side);
       emitEnd(p, { ...res, kind: "boss", result: "win", boss: d.boss, heal: Math.round(hl), ult: true, hp: Math.round(p.hp), mhp: p.mhp,
@@ -922,7 +1021,7 @@ function resolveDuel(d) {
     } else {
       p.streak = 0;
       noteWrong(p, d.q, pickOf(p) ? pickOf(p).choice : -1);
-      if (d.boss === "serpent" && p.items.length) { pushLog(`🐍 ${p.name} 이(가) 에덴의 뱀에게 아이템 ${p.items.length}개를 빼앗겼습니다`, "draw"); p.items = []; }
+      if (d.boss === "serpent") { p.ultReady = Math.max(p.ultReady, t + ultCdFor(p)); p.ultArm = null; pushLog(`🐍 ${p.name} 이(가) 에덴의 뱀에게 궁극기를 빼앗겼습니다`, "draw"); }
       const blocked = !!d.shield[p.id];
       const r = blocked ? { taken: 0, absorbed: 0, down: false } : hurt(p, Math.round(p.mhp * bossDmgPct(d.boss) * defMul(p)), null, "boss");
       if (!r.down) pushLog(`${p.name} 이(가) ${B.name}에게 당했습니다 (−${r.taken})`, "draw");
@@ -1137,8 +1236,8 @@ function updateFlood(t) {
     if (f >= GROW_END - 30000 / T) once("warn0", () => { pushLog("⚠ 30초 뒤 홍수! 그때부터는 쓰러지면 탈락입니다", "warn"); bigEvent("⚠ 30초 뒤 홍수 — 이제 부활 없음!", "warn"); });
     if (f >= GROW_END) {
       G.stage = "flood";
-      for (const p of G.players.values()) if (p.st === "ok") heal(p, p.mhp * .3);   // 숨 고르기: 모두 체력 30% 회복
-      pushLog("🌊 홍수가 시작됐습니다! 모두 체력 30% 회복 — 이제 쓰러지면 탈락", "warn");
+      for (const p of G.players.values()) if (p.st === "ok") heal(p, p.mhp * .4);   // 숨 고르기: 모두 체력 40% 회복
+      pushLog("🌊 홍수가 시작됐습니다! 모두 체력 40% 회복 — 이제 쓰러지면 탈락", "warn");
       bigEvent("🌊 홍수 시작! 이제 쓰러지면 탈락", "warn");
     }
   }
@@ -1219,21 +1318,45 @@ function nearestEnemy(p, t) {
   if (p.duel || p.st !== "ok") return null;
   let best = null, bd = 1e9;
   for (const o of G.players.values()) {
-    if (o === p || !o.connected || o.duel || !fighting(o) || stealth(o, t) || !enemies(p, o)) continue;
-    if ((p.recent.get(o.id) || 0) > t) continue;
+    if (o === p || !o.connected || !fighting(o) || stealth(o, t) || !enemies(p, o)) continue;
     const d = Math.hypot(o.x - p.x, o.y - p.y);
     if (d < bd) { bd = d; best = o; }
   }
   if (!best) return null;
   return [Math.round((best.x - p.x) / bd * 100) / 100, Math.round((best.y - p.y) / bd * 100) / 100, bd | 0];
 }
-function ambushTarget(p, t) {
-  if (!stealth(p, t) || p.duel || p.st !== "ok") return null;
-  let best = null, bd = 90;
+/* 공격할 수 있는 사람인지: 싸울 수 있고, 적이고, 무적·회피 중이 아니고, 숨었으면 아주 가까울 때만 */
+function canTarget(p, o, t, range) {
+  if (o === p || !fighting(o) || !enemies(p, o)) return false;
+  if (!o.connected && t - (o.discAt || 0) < DISC_TARGET_MS) return false;       // 잠깐 끊긴 친구는 보호
+  if (t < o.safeUntil || t < o.immuneUntil || t < o.dodgeUntil) return false;
+  const d = Math.hypot(o.x - p.x, o.y - p.y);
+  if (d > range) return false;
+  if (stealth(o, t) && d > AMBUSH_RANGE) return false;
+  return true;
+}
+/* 공격 버튼이 노릴 대상: 가까운 적 사람 → 보스 → 미니언 순서 */
+function bestTarget(p, t) {
+  if (p.st !== "ok" || p.duel || !G.participants.has(p.id)) return null;
+  let best = null, bd = 1e9;
   for (const o of G.players.values()) {
-    if (o === p || !o.connected || o.duel || !fighting(o) || t < o.safeUntil || t < o.immuneUntil || stealth(o, t) || !enemies(p, o)) continue;
+    if (!canTarget(p, o, t, ATTACK_RANGE)) continue;
     const d = Math.hypot(o.x - p.x, o.y - p.y);
-    if (d < bd) { bd = d; best = o; }
+    if (d < bd) { bd = d; best = { k: 0, o, d }; }
+  }
+  if (best) return best;
+  for (const b of G.bosses) {
+    if (b.dead || t < b.busyUntil) continue;
+    const d = Math.hypot(b.x - p.x, b.y - p.y);
+    if (d > ATTACK_RANGE || (tileAt(b.x, b.y) === 5 && d > 110)) continue;
+    if (d < bd) { bd = d; best = { k: 1, o: b, d }; }
+  }
+  if (best) return best;
+  for (const m of G.minions) {
+    if (m.dead || t < m.busyUntil) continue;
+    const d = Math.hypot(m.x - p.x, m.y - p.y);
+    if (d > ATTACK_RANGE) continue;
+    if (d < bd) { bd = d; best = { k: 2, o: m, d }; }
   }
   return best;
 }
@@ -1331,8 +1454,8 @@ function step(dt, t) {
       }
     } else p.capTick = 0;
     if (G.treasure && Math.hypot(p.x - G.treasure.x, p.y - G.treasure.y) < 34 && !p.duel) {
-      addXp(p, XP.treasure, "숨겨진 보물"); heal(p, p.mhp);
-      pushLog(`💎 ${p.name} 이(가) 숨겨진 보물을 찾았습니다! 체력 모두 회복 + 경험치`, "gold");
+      addXp(p, XP.treasure, "숨겨진 보물"); heal(p, p.mhp); offerCards(p, p.level || 1, "box", 3);
+      pushLog(`💎 ${p.name} 이(가) 숨겨진 보물을 찾았습니다! 체력 모두 회복 + 전설 카드`, "gold");
       bigEvent(`💎 ${p.name} 보물 발견!`, "gold");
       if (p.socketId) io.to(p.socketId).emit("treasure");
       G.treasure = null; G.nextTreasure = t + TREASURE_EVERY;
@@ -1361,28 +1484,9 @@ function step(dt, t) {
   }
   for (const p of ready) {
     if (p.duel) continue;
-    // ① 사람끼리 (가장 우선)
-    const cx = (p.x / CELL) | 0, cy = (p.y / CELL) | 0;
-    for (let gx = cx - 1; gx <= cx + 1 && !p.duel; gx++)
-      for (let gy = cy - 1; gy <= cy + 1 && !p.duel; gy++) {
-        const cell = grid.get(gx + ":" + gy);
-        if (!cell) continue;
-        for (const o of cell) {
-          if (o === p || o.duel || o.id < p.id || !enemies(p, o)) continue;
-          if (Math.hypot(p.x - o.x, p.y - o.y) > MEET) continue;
-          if ((p.recent.get(o.id) || 0) > t) continue;
-          startDuel(p, o); break;
-        }
-      }
-    if (p.duel) continue;
-    // ② 보스
+    // 사람끼리·미니언은 부딪혀도 아무 일 없음 — '공격' 버튼으로만 싸웁니다. 보스만 붙잡으러 옵니다
     const hitBoss = G.bosses.find((b) => !b.dead && t >= b.busyUntil && Math.hypot(p.x - b.x, p.y - b.y) < 44);
     if (hitBoss) { startBossDuel(p, hitBoss); continue; }
-    // ③ 미니언 (직전 미니언 대결 후 5초는 통과)
-    if (t >= (p.minionCool || 0)) {
-      const hitMin = G.minions.find((m) => !m.dead && t >= m.busyUntil && Math.hypot(p.x - m.x, p.y - m.y) < 32);
-      if (hitMin) { startMinionDuel(p, hitMin); continue; }
-    }
   }
   for (const d of [...G.duels.values()]) {
     if (d.kind === "judge") continue;
@@ -1400,23 +1504,13 @@ function step(dt, t) {
 
 function openBox(p, b) {
   const i = G.boxes.indexOf(b); if (i < 0) return;
-  G.boxes.splice(i, 1); giveItem(p, b.type, b.tier, b.x, b.y);
+  G.boxes.splice(i, 1);
+  p.boxCount++; quest(p, "box5"); addXp(p, XP.chest + b.tier * 10, "상자");
+  offerCards(p, p.level || 1, "box", b.tier);                        // 상자 = 강화 카드 3장 중 1장
+  if (b.tier >= 2) { pushLog(`💜 ${p.name} 전설 상자! 전설 카드를 고릅니다`, "gold"); bigEvent(`💜 ${p.name} 전설 상자!`, "gold"); }
   G.opened.push([b.x | 0, b.y | 0, b.tier, now()]);
   p.chestId = 0;
-}
-function giveItem(p, type, tier, bx, by) {
-  const t = now();
-  p.boxCount++; quest(p, "box5"); addXp(p, XP.chest + tier * 10, "상자");
-  let mult = p.cls === "staff" ? 1.5 : 1;
-  if (isUnderdog(p)) mult *= 1.5;
-  if (type === "speed") p.speedUntil = t + 10000 * mult;
-  else if (type === "ghost") p.ghostUntil = t + 10000 * mult;
-  else if (type === "manna") heal(p, p.mhp * .4);
-  else if (type === "crown") {
-    heal(p, p.mhp); p.speedUntil = t + 20000; p.ghostUntil = t + 20000; p.items = ["shield", "double"];
-    pushLog(`👑 ${p.name} 전설의 왕관!`, "gold"); bigEvent(`👑 ${p.name} 전설 상자!`, "gold");
-  } else { p.items.push(type); if (p.items.length > 2) p.items.shift(); }
-  if (p.socketId) io.to(p.socketId).emit("pickup", { type, tier: tier | 0, x: bx | 0, y: by | 0, ...BOX_ITEMS[type], hp: Math.round(p.hp), mhp: p.mhp });
+  if (p.socketId) io.to(p.socketId).emit("pickup", { tier: b.tier, x: b.x | 0, y: b.y | 0 });
 }
 function updateZone(t) {                 // 성장 단계 중반에 리워야단이 한 번 나타납니다
   const ratio = (t - G.startedAt) / (G.endsAt - G.startedAt);
@@ -1459,11 +1553,11 @@ function farSpot(minD, inside) {
 }
 /* ── 미니언: 부딪히면 쉬운 문제, 맞히면 경험치·조금 회복(+열쇠 확률). 틀려도 손해 없음 ── */
 const MINIONS = {
-  soldier: { name: "블레셋 병사", speed: 38, xp: 15, key: .3,  limit: 12, mode: "patrol" },
-  fox:     { name: "광야 여우",   speed: 92, xp: 30, key: .5,  limit: 12, mode: "flee" },
-  locust:  { name: "메뚜기 떼",   speed: 55, xp: 10, key: .15, limit: 11, mode: "swarm" },
+  soldier: { name: "블레셋 병사", speed: 38, xp: 15, key: .3,  limit: 9, mode: "patrol" },
+  fox:     { name: "광야 여우",   speed: 92, xp: 30, key: .5,  limit: 9, mode: "flee" },
+  locust:  { name: "메뚜기 떼",   speed: 55, xp: 10, key: .15, limit: 8, mode: "swarm" },
 };
-const minionTarget = () => Math.min(40, 12 + Math.round(G.players.size * .45));   // 60명이면 39마리
+const minionTarget = () => Math.min(16, 6 + Math.round(G.players.size * .17));    // 60명이면 16마리 (예전 39마리)
 function spawnMinion(type) {
   const s = farSpot(200);
   const m = { id: G.nextMinionId++, type, x: s.x, y: s.y, tx: s.x, ty: s.y, face: 1, walk: 0, dead: false, busyUntil: 0 };
@@ -1472,9 +1566,9 @@ function spawnMinion(type) {
 function fillMinions() {
   while (G.minions.filter((m) => !m.dead).length < minionTarget()) {
     const r = Math.random();
-    if (r < .45) spawnMinion("soldier");
-    else if (r < .7) spawnMinion("fox");
-    else { const base = spawnMinion("locust"); for (let k = 0; k < 2; k++) { const l = spawnMinion("locust"); l.x = base.x + (Math.random() - .5) * 60; l.y = base.y + (Math.random() - .5) * 60; } }
+    if (r < .5) spawnMinion("soldier");
+    else if (r < .8) spawnMinion("fox");
+    else { const base = spawnMinion("locust"); const l = spawnMinion("locust"); l.x = base.x + (Math.random() - .5) * 50; l.y = base.y + (Math.random() - .5) * 50; }
   }
 }
 function updateMinions(dt, t) {
@@ -1490,8 +1584,7 @@ function updateMinions(dt, t) {
     let near = null, nd = 1e9;
     for (const p of G.players.values()) { if (!p.connected || p.duel || p.st !== "ok") continue; const d = Math.hypot(p.x - m.x, p.y - m.y); if (d < nd) { nd = d; near = p; } }
     if (M.mode === "flee" && near && nd < 220) { m.tx = m.x + (m.x - near.x) / nd * 200; m.ty = m.y + (m.y - near.y) / nd * 200; sp *= 1.15; }
-    // 병사·메뚜기는 가까운 사람에게 천천히 다가옵니다 (넓은 맵에서 만날 수 있게)
-    else if (M.mode !== "flee" && near && nd < (M.mode === "patrol" ? 340 : 240)) { m.tx = near.x; m.ty = near.y; }
+    // 미니언은 사람을 쫓아오지 않습니다 (공격 버튼으로 잡는 선택 사냥감)
     else if (Math.hypot(m.tx - m.x, m.ty - m.y) < 12 || t > (m.retarget || 0)) {
       m.retarget = t + 2500 + Math.random() * 3000;
       const rr = M.mode === "swarm" ? 90 : 220;
@@ -1599,11 +1692,12 @@ function updateTreasure(t) {
 function autoFeature(t) {
   if (t < G.featuredManual) return;
   if (G.featured && G.duels.has(G.featured)) return;
+  if (G.reveal && t < G.reveal.until - 1200) return;                 // 방금 끝난 중계 결과를 먼저 충분히 보여 줌
   let best = null, bs = -1;
   const aliveN = [...G.players.values()].filter((p) => G.participants.has(p.id) && inGame(p)).length;
   for (const d of G.duels.values()) {
-    if (d.kind !== "pvp" && d.kind !== "boss") continue;
-    const a = G.players.get(d.a), b = d.kind === "boss" ? null : G.players.get(d.b);
+    if (d.kind !== "pvp" && d.kind !== "boss" && d.kind !== "attack") continue;
+    const a = G.players.get(d.a), b = d.kind === "boss" ? null : G.players.get(d.kind === "attack" ? d.target : d.b);
     if (!a) continue;
     let s = 1;
     if (d.kind === "boss") s += d.boss === "leviathan" ? 20 : 8;
@@ -1687,6 +1781,11 @@ setInterval(() => {
   }
   const d = [];
   for (const u of G.duels.values()) {
+    if (u.kind === "attack") {
+      const a = G.players.get(u.a), o = G.players.get(u.target); if (!a || !o) continue;
+      d.push([a.x | 0, a.y | 0, o.x | 0, o.y | 0, numOf.get(a.id), numOf.get(o.id), Math.max(0, Math.ceil((u.endsAt - t) / 1000)), u.id, 0, 1]);
+      continue;
+    }
     if (u.kind !== "pvp" && u.kind !== "boss") continue;
     const a = G.players.get(u.a), b = u.kind === "boss" ? null : G.players.get(u.b);
     if (!a || (u.kind !== "boss" && !b)) continue;
@@ -1704,9 +1803,9 @@ setInterval(() => {
     bosses: G.bosses.filter((b) => !b.dead).map((b) => [b.x | 0, b.y | 0, (b.walk | 0) % 64, b.face, b.type, b.id, tileAt(b.x, b.y) === 5 ? 1 : 0, t < (b.dashUntil || 0) ? 1 : 0]),
     mn: G.minions.filter((m) => !m.dead).map((m) => [m.id, m.x | 0, m.y | 0, m.type, (m.walk | 0) % 64, m.face]),
     tr: G.treasure ? [G.treasure.x | 0, G.treasure.y | 0] : null,
-    feat: fd ? { id: fd.id, boss: fd.boss || null, q: fd.q.text, options: fd.q.options,
+    feat: fd ? { id: fd.id, boss: fd.boss || null, atk: fd.kind === "attack", q: fd.q.text, options: fd.q.options,
                  left: Math.max(0, Math.ceil((fd.endsAt - t) / 1000)),
-                 a: sideOf(fd, fd.a), b: fd.kind === "boss" ? { name: BOSSES[fd.boss].name, boss: true } : sideOf(fd, fd.b) } : null,
+                 a: sideOf(fd, fd.a), b: fd.kind === "boss" ? { name: BOSSES[fd.boss].name, boss: true } : sideOf(fd, fd.kind === "attack" ? fd.target : fd.b) } : null,
     reveal: (G.reveal && t < G.reveal.until) ? G.reveal : null,
   });
 }, SEND_HOST);
@@ -1750,6 +1849,13 @@ const VIEW = 340, NEAR_MAX = 14;
 setInterval(() => {
   const t = now();
   const all = [...G.players.values()];
+  const aimedAt = new Map();                                  // 누가 나를 노리고 있나 (기습은 안 알려 줌)
+  for (const d of G.duels.values()) {
+    if (d.kind !== "attack" || d.ambush) continue;
+    const a = G.players.get(d.a); if (!a) continue;
+    if (!aimedAt.has(d.target)) aimedAt.set(d.target, []);
+    aimedAt.get(d.target).push([numOf.get(a.id), a.x | 0, a.y | 0, Math.max(0, Math.ceil((d.endsAt - t) / 1000))]);
+  }
   const zp = zonePacket(), al = aliveCount(), tot = G.participants.size;
   for (const p of all) {
     if (!p.socketId || !p.connected) continue;
@@ -1778,7 +1884,9 @@ setInterval(() => {
       f: flagsOf(p, t) | (t < p.safeUntil ? 32 : 0),
       cd: G.phase === "countdown" ? Math.max(0, Math.ceil((G.countdownEnd - t) / 1000)) : 0,
       n, bosses: bn, mn, tr: trn, seq: rosterSeq, mapSeq: MAP.seq,
-      amb: ambushTarget(p, t) ? 1 : 0,
+      tg: (() => { const b = G.phase === "playing" && G.stage !== "judge" ? bestTarget(p, t) : null;
+        return b ? [b.k, b.k === 0 ? numOf.get(b.o.id) : b.o.id, b.o.x | 0, b.o.y | 0, Math.round(b.d)] : null; })(),
+      am: aimedAt.get(p.id) || null, acd: Math.max(0, Math.ceil(((p.atkCool || 0) - t) / TIME_SCALE)),
       en: nearestEnemy(p, t), bm: nearestBleedingMate(p),
       lv: p.level || 1, zn: zoneOf(cx, cy),
       ch: p.chestId ? Math.min(1, (t - p.chestT) / 2500) : 0,
@@ -1813,7 +1921,7 @@ setInterval(() => {
     io.to(p.socketId).emit("meta", {
       hp: Math.round(p.hp), mhp: p.mhp, atk: p.atk, def: Math.round((1 - defMul(p)) * 100), perk: p.perk,
       kills: p.kills, hits: p.hits, answered: p.answered, correct: p.correct, streak: p.streak, guard: p.guard,
-      items: p.items.map((k) => ({ key: k, ...BOX_ITEMS[k] })),
+      items: [],
       rank: aliveRank.get(p.id) || 0, place: p.place || 0, alive: al, total: G.participants.size || G.players.size,
       top, boxes, caps, team: p.team, mode: G.mode, teams: ts, region: regionOf(p.y, p.x), stage: G.stage, floodIdx: G.floodIdx,
       tier: TIERS[tierIdx(p.level)],
@@ -1823,7 +1931,7 @@ setInterval(() => {
       boost: Math.max(0, Math.ceil(((p.catchUpUntil || 0) - t) / 1000)),
       quests: QUESTS.map((q) => ({ id: q.id, name: q.name, desc: q.desc, need: q.need, have: Math.min(q.need, p.q[q.id] || 0), done: !!p.qDone[q.id] })),
       ult: { cls: p.cls, name: U.name, icon: U.icon, desc: U.desc, cd: Math.round(ultCdFor(p) / 1000) },
-      cards: pc && pc.until ? { level: pc.level, opts: pc.opts.map((id) => CARD[id]), left: Math.max(0, Math.ceil((pc.until - t) / 1000)), more: p.pendingCards.length - 1 } : null,
+      cards: pc && pc.until ? { level: pc.level, opts: pc.opts.map((id) => CARD[id]), left: Math.max(0, Math.ceil((pc.until - t) / 1000 / TIME_SCALE)), more: p.pendingCards.length - 1, src: pc.src, tier: pc.tier } : null,
       survivors: out ? survivors.filter((s) => !teamCount() || s.tm === p.team || !survivors.some((x) => x.tm === p.team)) : null,
       pray: out ? { target: p.prayTarget ? numOf.get(p.prayTarget) : 0, pts: p.prayPts, need: PRAY_NEED, on: p.prayOn, given: p.prayers } : null,
       down: p.st === "down" ? { got: p.reviveGot, need: REVIVE_NEED } : null,
@@ -1832,7 +1940,14 @@ setInterval(() => {
 }, SEND_META);
 
 /* ═════════ 게임 제어 ═════════ */
+/* 떠난 사람(연결이 끊긴 채인 사람)은 명단에서 뺍니다 — 다시 들어오면 새로 참가 */
+function pruneGone() {
+  let n = 0;
+  for (const [id, p] of [...G.players]) if (!p.connected) { G.players.delete(id); n++; }
+  return n;
+}
 function startGame(min) {
+  pruneGone();
   MAP = buildMap(...mapSizeFor(Math.max(2, G.players.size)));
   G.zone = { x: MAP.W / 2, y: MAP.H / 2, r: 1e9 };
   io.emit("mapChanged");
@@ -1873,7 +1988,7 @@ function beginPlay() {
     p.ultReady = G.startedAt + ULT_FIRST;
     if (p.practiceXp) { addXp(p, p.practiceXp, "연습 퀴즈 출발 보너스"); p.practiceXp = 0; p.practiceCorrect = 0; }
   }
-  pushLog("게임 시작! 마주치면 성경 대결 — 맞히면 상대 체력이 깎입니다", "hot");
+  pushLog("게임 시작! 적 가까이에서 ⚔ 공격 — 내 폰 문제를 맞히는 순간 피해!", "hot");
   bigEvent("🌱 성장 단계 — 쓰러져도 문제를 맞히면 부활!", "gold");
 }
 /* 최종 순위: 살아남은 사람(우승자 먼저, 체력 비율 순) → 탈락 순서의 역순 */
@@ -2005,8 +2120,10 @@ function resetToLobby() {
   Object.assign(G, { boxes: [], opened: [], bosses: [], minions: [], treasure: null, featured: null, leaderId: null,
     stage: "grow", floodIdx: -1, floodPlan: [], zone: { x: 0, y: 0, r: 1e9 }, zoneNext: null, judge: null, winner: null, told: {}, teamPlace: {} });
   G.participants = new Set();
+  pruneGone();
   for (const p of G.players.values()) { freshStats(p); p.seen.clear(); }
   io.emit("resetToLobby");
+  bumpRoster();
 }
 
 /* ═════════ HTTP ═════════ */
@@ -2023,8 +2140,9 @@ app.get("/api/join-info", async (q, r) => {
   const asked = typeof q.query.u === "string" ? q.query.u.trim() : "";
   const url = /^https?:\/\/[A-Za-z0-9.\-_:\[\]]+$/.test(asked) && !/localhost|127\.0\.0\.1/.test(asked) ? asked : JOIN_URL;
   const qr = await QRCode.toDataURL(url, { margin: 1, width: 620, color: { dark: "#141021", light: "#FFFFFF" } });
-  r.json({ url, qr, lan: JOIN_URL, zones: ZONES, cards: CARDS, ults: ULTS, xpTable: XP_TABLE, items: BOX_ITEMS, teams: TEAMS, qproblems: G.qproblems, emotes: EMOTES, tiers: TIERS,
-    rules: { hp: HP0, atk: ATK0, cap: HIT_CAP, counter: COUNTER_MS / 1000, revive: REVIVE_NEED, bleed: BLEED_MS / 1000, teamrev: TEAMREV_MAX, pray: PRAY_NEED, ult: ULT_CD / 1000 },
+  r.json({ url, qr, lan: JOIN_URL, zones: ZONES, cards: CARDS, ults: ULTS, xpTable: XP_TABLE, items: {}, teams: TEAMS, qproblems: G.qproblems, emotes: EMOTES, tiers: TIERS,
+    rules: { hp: HP0, atk: ATK0, cap: HIT_CAP, revive: REVIVE_NEED, bleed: BLEED_MS / 1000, teamrev: TEAMREV_MAX, pray: PRAY_NEED, ult: ULT_CD / 1000,
+             range: ATTACK_RANGE, atkQ: ATTACK_Q, quick: QUICK_MS / 1000, quickMul: QUICK_MUL, hold: ATTACK_HOLD },
     minions: Object.fromEntries(Object.entries(MINIONS).map(([k, v]) => [k, { name: v.name, xp: v.xp, key: v.key }])),
     bosses: Object.fromEntries(Object.entries(BOSSES).map(([k, v]) => [k, { name: v.name, dmg: Math.round(bossDmgPct(k) * 100), trait: v.trait, desc: v.desc }])) });
 });
@@ -2153,12 +2271,12 @@ io.on("connection", (socket) => {
           p.catchUpUntil = now() + 120000;               // 2분 동안 경험치 2배
           p.ultReady = now() + 30000;                    // 궁극기는 30초 뒤
           p.keys = 1;
-          p.items = [["speed", "shield", "hint", "time", "double"][Math.random() * 5 | 0]];
+          later(1500, () => offerCards(p, p.level, "gift", 1));        // 지각 선물: 희귀 카드 1장 고르기
           const sp = joinSpot(); p.x = sp.x; p.y = sp.y;
           p.lateJoin = true; G.participants.add(p.id);
           pushLog(`${c.name} 지각 입장! Lv${startLv} 지원 · 2분간 경험치 2배`, "hot");
           later(400, () => { if (p.socketId) io.to(p.socketId).emit("lateJoin", {
-            level: startLv, keys: 1, item: BOX_ITEMS[p.items[0]], boost: 120, safe: 10, hp: p.mhp, atk: p.atk,
+            level: startLv, keys: 1, gift: "희귀 강화 카드 1장", boost: 120, safe: 10, hp: p.mhp, atk: p.atk,
             left: leftSec(), alive: aliveCount() }); });
         } else {
           p.st = "spec";                                  // 홍수 단계부터는 관전 + 중보기도로 참여
@@ -2169,15 +2287,20 @@ io.on("connection", (socket) => {
       G.players.set(p.id, p);
       if (!p.lateJoin && p.st !== "spec") pushLog(`${c.name} 참가!`);
       changed = true;
-    } else if (G.phase === "lobby") {
-      p.name = c.name; p.look = L; p.cls = ITEM_CLASS[L.it];
-      p.guard = p.cls === "shield" ? 2 : 0;
-      changed = true;
+    } else if (G.phase === "lobby" || G.phase === "ended") {           // 판과 판 사이엔 이름·캐릭터를 다시 정할 수 있음
+      if (c.name !== p.name && [...G.players.values()].some((x) => x !== p && x.name === c.name && x.connected))
+        return socket.emit("joinError", "같은 이름이 있어요. 한 글자만 바꿔 주세요.");
+      if (c.name !== p.name || JSON.stringify(L) !== JSON.stringify(p.look)) {
+        p.name = c.name; p.look = L; p.cls = ITEM_CLASS[L.it];
+        p.guard = p.cls === "shield" ? 2 : 0;
+        changed = true;
+      }
     }
-    p.connected = true; p.socketId = socket.id; socket.data.pid = p.id;
+    p.connected = true; p.socketId = socket.id; socket.data.pid = p.id; p.discAt = 0;
     if (changed) bumpRoster();
     socket.emit("roster", { seq: rosterSeq, list: rosterPayload(), mode: G.mode, teams: TEAMS.slice(0, teamCount()) });
-    socket.emit("joined", { id: p.id, u: numOf.get(p.id), name: p.name, look: p.look, cls: p.cls, team: p.team, ult: ULTS[p.cls] });
+    socket.emit("joined", { id: p.id, u: numOf.get(p.id), name: p.name, look: p.look, cls: p.cls, team: p.team, ult: ULTS[p.cls], ph: G.phase,
+      part: G.participants.has(p.id) });
     if (p.duel && G.duels.has(p.duel)) sendDuel(p, G.duels.get(p.duel));
     if (p.pendingCards.length) later(900, () => sendCards(p));
   });
@@ -2202,12 +2325,21 @@ io.on("connection", (socket) => {
     p.budget -= dt;
     if (dt > 0) applyMove(p, x, y, dt, t);
   });
-  socket.on("ambush", () => {
+  /* 공격 버튼: 폰이 보고 있던 대상을 먼저 확인하고(지연을 생각해 조금 넉넉히), 안 되면 가장 가까운 대상 */
+  socket.on("attack", (o) => {
     const p = me(), t = now();
-    if (!p || G.phase !== "playing" || p.st !== "ok" || G.stage === "judge") return;
-    const target = ambushTarget(p, t);
-    if (!target) return;
-    startDuel(p, target, true);
+    if (!p || G.phase !== "playing" || G.stage === "judge" || G.winner || p.st !== "ok" || p.duel || !G.participants.has(p.id)) return;
+    if (t < (p.atkCool || 0)) return socket.emit("attackNo", { msg: "잠깐! 곧 다시 공격할 수 있어요" });
+    const k = o ? +o.k : -1, want = o ? +o.id : 0, R2 = ATTACK_RANGE + 60;
+    let tg = null;
+    if (k === 0) { const q = G.players.get(idOfNum.get(want)); if (q && canTarget(p, q, t, R2)) tg = { k: 0, o: q }; }
+    else if (k === 1) { const b = G.bosses.find((x) => x.id === want && !x.dead && t >= x.busyUntil && Math.hypot(x.x - p.x, x.y - p.y) <= R2); if (b) tg = { k: 1, o: b }; }
+    else if (k === 2) { const m = G.minions.find((x) => x.id === want && !x.dead && t >= x.busyUntil && Math.hypot(x.x - p.x, x.y - p.y) <= R2); if (m) tg = { k: 2, o: m }; }
+    if (!tg) { const b = bestTarget(p, t); if (b && (k !== 0 || b.k === 0)) tg = b; }     // 사람을 노렸는데 보스가 잡히는 일은 없게
+    if (!tg) return socket.emit("attackNo", { msg: k === 0 ? "상대가 멀어졌거나 지금은 무적이에요" : "가까이에 공격할 상대가 없어요" });
+    if (tg.k === 0) startAttack(p, tg.o);
+    else if (tg.k === 1) startBossDuel(p, tg.o);
+    else startMinionDuel(p, tg.o);
   });
   /* 대기실 연습 퀴즈 — 3문제 맞히면 출발 보너스 XP */
   socket.on("practice:get", () => {
@@ -2230,7 +2362,7 @@ io.on("connection", (socket) => {
   socket.on("dodge", () => {
     const p = me(), t = now();
     if (!p || p.duel || G.phase !== "playing" || p.st !== "ok" || t < p.dodgeReady) return;
-    p.dodgeUntil = t + DODGE_TIME; p.dodgeReady = t + DODGE_COOL;
+    p.dodgeUntil = t + DODGE_TIME; p.dodgeReady = t + dodgeCool(p);
     socket.emit("dodgeOk");
   });
   socket.on("answer", (o) => {
@@ -2243,7 +2375,7 @@ io.on("connection", (socket) => {
     if (!(c >= 0 && c <= 3) || (d.hide[p.id] || []).includes(c)) return;
     const ok = c === d.q.answer;
     d.picks[p.id] = { choice: c, correct: ok, at: now() };
-    if (d.kind === "pvp" || d.kind === "boss" || d.kind === "sermon") { p.answered++; if (ok) p.correct++; }
+    if (d.kind === "pvp" || d.kind === "boss" || d.kind === "sermon" || d.kind === "attack" || d.kind === "minion") { p.answered++; if (ok) p.correct++; }
     if (d.kind === "judge") { socket.emit("submitted", { judge: true }); return judgeAnswered(); }
     if (d.kind !== "pvp") return resolveDuel(d);           // 혼자 푸는 문제는 바로 판정
     const foeId = d.a === p.id ? d.b : d.a, foe = G.players.get(foeId);
@@ -2263,9 +2395,9 @@ io.on("connection", (socket) => {
     if (t < p.ultReady) return socket.emit("ultNo", { msg: `${Math.ceil((p.ultReady - t) / 1000)}초 뒤에 준비됩니다` });
     const U = ULTS[p.cls] || ULTS.sling;
     let effect = "";
-    if (p.cls === "sling") { p.ultArm = "sling"; p.ultArmUntil = t + 30000; effect = "다음 대결에서 맞히면 큰 피해! (30초 안에)"; }
-    else if (p.cls === "lamp") { p.ultArm = "lamp"; p.lampLeft = 3; p.ultArmUntil = t + 45000; effect = "다음 대결 3번 동안 오답 2개 삭제 (45초 안에)"; }
-    else if (p.cls === "shield") { const h = heal(p, p.mhp * .25); p.ultShieldUntil = t + 25000; effect = `체력 +${Math.round(h)} · 다음 대결 피해 0`; }
+    if (p.cls === "sling") { p.ultArm = "sling"; p.ultArmUntil = t + 30000; effect = "다음 공격에서 맞히면 큰 피해! (30초 안에)"; }
+    else if (p.cls === "lamp") { p.ultArm = "lamp"; p.lampLeft = 3; p.ultArmUntil = t + 45000; effect = "다음 문제 3번 동안 오답 2개 삭제 (45초 안에)"; }
+    else if (p.cls === "shield") { const h = heal(p, p.mhp * .25); p.ultShieldUntil = t + 25000; effect = `체력 +${Math.round(h)} · 25초 안에 받는 공격 한 번 막음`; }
     else if (p.cls === "harp") {
       const h = heal(p, p.mhp * .45); let n = 0, rv = 0;
       if (teamCount()) for (const o of G.players.values()) {
@@ -2316,7 +2448,7 @@ io.on("connection", (socket) => {
   socket.on("ping2", (ts) => socket.emit("pong2", ts));
   socket.on("disconnect", () => {
     const p = me();
-    if (p) { p.connected = false; p.ix = p.iy = 0; p.moving = false; }
+    if (p) { p.connected = false; p.ix = p.iy = 0; p.moving = false; p.discAt = now(); }
   });
 });
 

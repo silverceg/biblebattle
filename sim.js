@@ -18,12 +18,12 @@ for (let i = 0; i < N; i++) {
   const r = i / N;
   PROFILES.push(r < .2 ? { g: "상", acc: rnd(.85, .95), spd: rnd(2500, 5000) }
              : r < .7 ? { g: "중", acc: rnd(.6, .78), spd: rnd(3500, 7500) }
-             : { g: "하", acc: rnd(.35, .55), spd: rnd(4500, 10000) });
+             : { g: "하", acc: rnd(.35, .55), spd: rnd(4500, 8500) });
 }
 const H = io(URL); let W = null, M = null, END = null;
 const aliveLog = [];                                     // [경과초, 생존자수, 단계]
 let t0 = 0, judgeRounds = 0, lastStage = "";
-const counts = { ult: {}, pray: 0, revive: 0, teamrev: 0, sermonHit: 0, kills: 0, down: 0 };
+const counts = { ult: {}, pray: 0, revive: 0, teamrev: 0, sermonHit: 0, kills: 0, down: 0, hits: 0, dmg: 0, cards: {} };
 const seenD = new Set(), duelsBy = { grow: 0, flood: 0 }, downBy = { grow: 0, flood: 0, judge: 0 };
 let hpAtFlood = null; const cause = {}; let hpByG = null;
 H.on("connect", () => H.emit("host:join"));
@@ -39,7 +39,7 @@ H.on("world", (w) => {
       hpByG = {}; for (const s of bots) { if (!s.f) continue; const g = s.prof.g; (hpByG[g] = hpByG[g] || []).push(Math.round(s.f.hp / Math.max(1, s.f.mhp) * 100)); } }
   }
 });
-H.on("meta", (m) => { M = m; (m.fx || []).forEach((f) => { if (f.k === "ult") counts.ult[f.cls] = (counts.ult[f.cls] || 0) + 1; if (f.k === "pray") counts.pray++; if (f.k === "revive") counts.revive++; if (f.k === "down") { counts.down++; downBy[(W && W.stg) || "grow"]++; cause[f.kind || "?"] = (cause[f.kind || "?"] || 0) + 1; } }); });
+H.on("meta", (m) => { M = m; (m.fx || []).forEach((f) => { if (f.k === "ult") counts.ult[f.cls] = (counts.ult[f.cls] || 0) + 1; if (f.k === "pray") counts.pray++; if (f.k === "hit") { counts.hits++; counts.dmg += f.dmg || 0; } if (f.k === "revive") counts.revive++; if (f.k === "down") { counts.down++; downBy[(W && W.stg) || "grow"]++; cause[f.kind || "?"] = (cause[f.kind || "?"] || 0) + 1; } }); });
 H.on("gameEnd", (e) => { END = e; });
 
 const bots = [];
@@ -76,6 +76,7 @@ for (let i = 0; i < N; i++) {
   s.on("foeFirst", () => { });                              // 반격 시간 안에 못 맞추면 그만
   s.on("duelEnd", () => { s.duel = null; clearTimeout(s.pickT); });
   s.on("cards", (c) => {
+    const ck = c.src === "box" ? "box" + (c.tier || 0) : c.src || "lv"; counts.cards[ck] = (counts.cards[ck] || 0) + 1;
     setTimeout(() => {
       const ids = c.opts.map((o) => o.id);
       const m = s.meta || {};
@@ -88,21 +89,31 @@ for (let i = 0; i < N; i++) {
   });
   bots.push(s);
 }
-/* 이동: 물 밖이면 안전지대로, 아니면 적을 쫓거나 배회. 궁극기는 상황 보고 사용 */
+/* 이동·공격: 물 밖이면 안전지대로, 노려지면 도망·회피, 공격 대상이 있으면 공격, 아니면 적을 찾아 이동 */
 setInterval(() => {
   for (const s of bots) {
     const f = s.f; if (!f || f.ph !== "playing" || f.st !== "ok" || s.duel) continue;
     let x = 0, y = 0;
     const z = f.z;
     const hpR = f.hp / Math.max(1, f.mhp);
+    const aimed = f.am && f.am.length ? f.am[0] : null;
+    // 공격: 사람이 사거리 안이면 거의 바로, 미니언은 적이 멀 때, 보스는 가끔
+    if (f.tg && !f.acd && Date.now() > (s.atkWait || 0)) {
+      const k = f.tg[0];
+      const want = k === 0 ? Math.random() < s.aggr * (hpR < .3 ? .5 : 1) : k === 2 ? (!f.en || f.en[2] > 300) && Math.random() < .5 : Math.random() < .12;
+      s.atkWait = Date.now() + rt(rnd(600, 1800));                 // 사람은 버튼을 누르기까지 조금 걸림
+      if (want) { s.emit("attack", { k, id: f.tg[1] }); continue; }
+    }
+    if (aimed && f.dodge === 0 && Math.random() < .08) s.emit("dodge");
     if (z && z[2] < 90000 && Math.hypot(f.x - z[0], f.y - z[1]) > z[2] - 60) { const d = Math.hypot(z[0] - f.x, z[1] - f.y) || 1; x = (z[0] - f.x) / d; y = (z[1] - f.y) / d; }
     else if (z && z[5] && !z[7] && Math.hypot(f.x - z[3], f.y - z[4]) > z[5] - 80) { const d = Math.hypot(z[3] - f.x, z[4] - f.y) || 1; x = (z[3] - f.x) / d; y = (z[4] - f.y) / d; }
     else if (f.bm) { x = f.bm[0]; y = f.bm[1]; }
+    else if (aimed && hpR < .45) { const d = Math.hypot(aimed[1] - f.x, aimed[2] - f.y) || 1; x = (f.x - aimed[1]) / d; y = (f.y - aimed[2]) / d; }   // 약하면 도망
     else {
       if (!s.modeT || Date.now() > s.modeT) { s.modeT = Date.now() + rt(rnd(1500, 3500)); s.mode = hpR < .3 && Math.random() < .6 ? "flee" : Math.random() < s.aggr ? "chase" : "wander"; }
-      if (f.en && s.mode === "chase") { x = f.en[0]; y = f.en[1]; }
+      if (f.en && s.mode === "chase" && f.en[2] > 110) { x = f.en[0]; y = f.en[1]; }
       else if (f.en && s.mode === "flee" && f.en[2] < 300) { x = -f.en[0]; y = -f.en[1]; }
-      else { s.ang += (Math.random() - .5) * .5; x = Math.cos(s.ang); y = Math.sin(s.ang); }
+      else if (s.mode === "wander" || !f.en) { s.ang += (Math.random() - .5) * .5; x = Math.cos(s.ang); y = Math.sin(s.ang); }
     }
     s.seq++;
     s.volatile.emit("move", { s: s.seq, x, y, dt: .07 * TS });
@@ -152,7 +163,7 @@ function report() {
   console.log(JSON.stringify({
     winner: END.winner && (END.winner.name || (END.teamWinner != null ? "팀" + END.teamWinner : "")), winnerGroup: wp.g, winnerAcc: wp.acc && +wp.acc.toFixed(2),
     judgeRounds, secs: dur, aliveAtJudge: (aliveLog.find((r) => r[2] === "judge") || [])[1] ?? null,
-    top10, avgPlace: avg, duels: duelsBy, downs: downBy, cause, hpAtFlood, ult: counts.ult, pray: counts.pray, revive: counts.revive,
+    top10, avgPlace: avg, attacks: duelsBy, hits: counts.hits, avgDmg: counts.hits ? Math.round(counts.dmg / counts.hits) : 0, downs: downBy, cause, hpAtFlood, ult: counts.ult, cards: counts.cards, pray: counts.pray, revive: counts.revive,
     maxKills: Math.max(...board.map((b) => b.kills)), topLv: Math.max(...board.map((b) => b.level)),
   }));
 }
