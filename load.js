@@ -1,5 +1,5 @@
 const { io } = require("socket.io-client");
-const URL = "http://localhost:3001";
+const URL = "http://localhost:" + (process.env.PORT || 3001);
 const N = Number(process.argv[2] || 60);
 const SECS = Number(process.argv[3] || 30);
 
@@ -28,7 +28,7 @@ for (let i = 0; i < N; i++) {
     if (duelQ.has(d.id)) { if (duelQ.get(d.id) !== d.question) dupSame++; }
     else { duelQ.set(d.id, d.question); if (seenQ.has(d.question)) dupGlobal++; seenQ.add(d.question); }
     const mine = perPlayer.get(s.pid); if (mine) { if (mine.has(d.question)) dupGlobal++; mine.add(d.question); }
-    setTimeout(() => s.emit("answer", { duelId: d.id, choice: Math.random() < .5 ? d.hide >= 0 ? 1 : 0 : Math.random() * 4 | 0 }),
+    setTimeout(() => s.emit("answer", { duelId: d.id, choice: Math.random() * 4 | 0 }),
       200 + Math.random() * 1200);
   });
   s.on("duelEnd", () => ends++);
@@ -39,7 +39,7 @@ for (let i = 0; i < N; i++) {
 const t = (ms, f) => setTimeout(f, ms);
 t(2500, () => {
   console.log(`접속 ${W.p.length}명 (요청 ${N}명)`);
-  H.emit("host:start", Math.max(2, Math.ceil(SECS / 60) + 1));
+  H.emit("host:start", { min: Math.max(3, Math.ceil(SECS / 60) + 1), mode: "solo" });
   console.log(`${SECS}초 동안 전원 이동 + 대결 진행…\n`);
 });
 
@@ -77,6 +77,6 @@ t(2500 + SECS * 1000, async () => {
   console.log(`문제 중복 출제   : ${dupGlobal}회`);
   console.log(`상자 유지        : ${HM.boxes.length}개 / 보스 ${(W.bosses||[]).length}마리`);
   const b = HM.board;
-  console.log(`1위 ${b[0].name} ${b[0].score}점 · 꼴찌 ${b[b.length-1].name} ${b[b.length-1].score}점`);
+  console.log(`생존 ${W.al}/${W.tot}명 · 단계 ${W.stg} · 1위 ${b[0].name} (처치 ${b[0].kills} · Lv${b[0].level} · 체력 ${b[0].hp}/${b[0].mhp})`);
   process.exit(0);
 });

@@ -1,11 +1,12 @@
 {
   "name": "bible-pixel-battle",
-  "version": "2.0.0",
-  "description": "성경 픽셀 배틀 — 실시간 멀티플레이 퀴즈 배틀",
+  "version": "3.0.0",
+  "description": "성경 픽셀 배틀 — 실시간 멀티플레이 성경 퀴즈 서바이벌",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "load": "node load.js 60 45"
+    "load": "node load.js 60 45",
+    "sim": "node sim.js 60 10 solo 6"
   },
   "dependencies": {
     "express": "^4.21.2",
