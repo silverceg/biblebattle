@@ -101,6 +101,15 @@
     zone:     () => { noise({ dur:.35, cut:300, filter:"lowpass", vol:.2 });
                       tone({ f: 160, to: 70, dur: .4, type:"sawtooth", vol:.16 }); },
     join:     () => seq([["G4",0,.07],["C5",.06,.14]], { type:"triangle", vol:.16 }),
+    // ── 서바이벌 ──
+    ult:      () => { tone({ f: 180, to: 1400, dur: .45, type: "sawtooth", vol: .14 }); noise({ dur: .5, cut: 600, cutTo: 5000, vol: .12 });
+                      seq([["C5",.38,.08],["G5",.45,.08],["C6",.52,.3]], { vol:.22 }); },
+    heal:     () => seq([["C5",0,.1],["E5",.08,.1],["G5",.16,.1],["C6",.24,.28]], { type:"triangle", vol:.2 }),
+    splash:   () => { noise({ dur:.5, cut:2400, cutTo:400, filter:"lowpass", vol:.22 }); tone({ f: 300, to: 90, dur: .35, type:"sine", vol:.14 }); },
+    hurt:     () => { noise({ dur:.12, cut:900, vol:.22 }); tone({ f: 220, to: 70, dur: .2, type:"square", vol:.16 }); },
+    ko:       () => { noise({ dur:.3, cut:500, vol:.22 }); seq([["C4",0,.12],["G3",.1,.12],["C3",.2,.4]], { type:"sawtooth", vol:.2 }); },
+    card:     () => seq([["A5",0,.05],["E6",.05,.12]], { vol:.18 }),
+    pray:     () => seq([["E5",0,.2],["G5",.18,.2],["B5",.36,.2],["E6",.54,.5]], { type:"sine", vol:.2 }),
     fanfare:  () => seq([["E5",0,.14],["E5",.15,.14],["F5",.3,.14],["G5",.45,.14],
                          ["G5",.6,.14],["F5",.75,.14],["E5",.9,.14],["D5",1.05,.14],
                          ["C5",1.2,.14],["C5",1.35,.14],["D5",1.5,.14],["E5",1.65,.14],

@@ -10,13 +10,13 @@
   const HAIRS = ["단정", "짧은머리", "곱슬", "긴머리", "삭발", "묶은머리"];
   const GEARS = ["없음", "두건", "왕관", "투구", "후드", "월계관"];
   const FITS  = ["튜닉", "겉옷", "갑옷", "망토", "앞치마", "줄무늬"];
-  const ITEMS = [
-    { id: "sling",  name: "물맷돌",   desc: "이동 속도가 15% 빠릅니다" },
-    { id: "shield", name: "방패",     desc: "패배해도 점수를 지킵니다 (2번)" },
-    { id: "scroll", name: "두루마리", desc: "대결 제한시간이 4초 깁니다" },
-    { id: "lamp",   name: "등불",     desc: "대결마다 25% 확률로 오답 보기가 지워집니다" },
-    { id: "staff",  name: "지팡이",   desc: "먹은 아이템 효과가 1.5배 오래갑니다" },
-    { id: "harp",   name: "수금",     desc: "비겨도 1점을 얻습니다" },
+  const ITEMS = [   // 지물 = 특성: 늘 붙는 효과(desc) + 궁극기(ult)
+    { id: "sling",  name: "물맷돌",   desc: "이동 속도 +12%",                    ult: "다윗의 물맷돌", uicon: "🎯", udesc: "다음 대결에서 맞히면 피해 2배 — 상대 레벨이 높을수록 더 세짐" },
+    { id: "shield", name: "방패",     desc: "처음 받는 피해 2번은 절반만",        ult: "믿음의 방패",   uicon: "🛡", udesc: "체력 25% 회복 + 다음 대결 피해 모두 막기" },
+    { id: "scroll", name: "두루마리", desc: "대결 제한 시간 +4초",               ult: "말씀 선포",     uicon: "📜", udesc: "주변 적 모두에게 문제 — 틀린 사람은 모두 피해" },
+    { id: "lamp",   name: "등불",     desc: "대결마다 25% 확률로 오답 하나 삭제", ult: "지혜의 빛",     uicon: "🕯", udesc: "다음 대결 3번 동안 오답 보기 2개 삭제" },
+    { id: "staff",  name: "지팡이",   desc: "상자 아이템 효과 1.5배 오래",        ult: "홍해 가르기",   uicon: "🌊", udesc: "주변 적을 밀어내고 8초 무적 · 빠른 이동 · 홍수 피해 없음" },
+    { id: "harp",   name: "수금",     desc: "체력 자연 회복 2배",                ult: "다윗의 수금",   uicon: "🎵", udesc: "체력 45% 회복 · 팀전이면 주변 팀원 회복 + 쓰러진 팀원 일으키기" },
   ];
 
   const DARK = "#231A14", EYE = "#2A1A12", BOOT = "#3B2B1E";
@@ -132,29 +132,72 @@
     else { P(hx, hy - 1, 1, 10, "#C98B3A"); P(hx + 4, hy, 1, 9, "#C98B3A"); P(hx, hy - 1, 5, 1, "#E0C36B"); P(hx + 1, hy + 1, 1, 7, "#FFF0B8"); P(hx + 2, hy + 2, 1, 6, "#FFF0B8"); P(hx + 3, hy + 3, 1, 5, "#FFF0B8"); }
   }
 
-  /* 스프라이트 캐시 — 같은 외형은 한 번만 그림 */
-  const cache = new Map();
+  /* 스프라이트 캐시 — 1배 크기로 한 번만 그리고(테두리 포함), 화면에는 정수 배율로만 확대합니다.
+     소수 배율(1.35배, 2.7배…)로 늘리면 픽셀 크기가 들쭉날쭉해져 흐려 보이기 때문입니다. */
+  const BW = 38, BH = 46, OX = 3, OY = 4;        // 기본 그림 크기와 여백 (왕관·후광·테두리가 잘리지 않게)
+  const AX = 19, AY = 44;                         // 발밑 기준점 (논리 좌표 x16, y40)
+  const baseCache = new Map();
   const key = (L, f, flip) => `${L.sk}_${L.hs}_${L.hc}_${L.ft}_${L.cc}_${L.gr}_${L.ac}_${L.it}_${L.tier|0}_${f}_${flip ? 1 : 0}`;
-
-  function sprite(L, frame, flip, S) {
-    S = S || 3;
-    const k = key(L, frame, flip) + "_" + S;
-    if (cache.has(k)) return cache.get(k);
-    const c = document.createElement("canvas");
-    c.width = 34 * S; c.height = 42 * S;
+  function base(L, frame, flip) {
+    const k = key(L, frame, flip);
+    let c = baseCache.get(k);
+    if (c) { baseCache.delete(k); baseCache.set(k, c); return c; }      // 최근 사용 순서 갱신
+    c = document.createElement("canvas");
+    c.width = BW; c.height = BH;
     const g = c.getContext("2d");
     g.imageSmoothingEnabled = false;
     g.save();
-    g.translate(S, S);
-    if (flip) { g.translate(32 * S, 0); g.scale(-S, S); } else g.scale(S, S);
+    if (flip) { g.translate(BW, 0); g.scale(-1, 1); }
+    g.translate(OX, OY);
     paint(g, L, frame);
     g.restore();
-    outline(g, c.width, c.height, S);
-    if (cache.size > 900) cache.clear();
-    cache.set(k, c);
+    outline(g, BW, BH, 1);
+    baseCache.set(k, c);
+    if (baseCache.size > 1600) baseCache.delete(baseCache.keys().next().value);
     return c;
   }
-
+  /* 예전 호출 호환용 — 정수 배율 S로 키운 캔버스 */
+  const bigCache = new Map();
+  function sprite(L, frame, flip, S) {
+    S = Math.max(1, Math.round(S || 3));
+    const k = key(L, frame, flip) + "_" + S;
+    if (bigCache.has(k)) return bigCache.get(k);
+    const c = document.createElement("canvas");
+    c.width = BW * S; c.height = BH * S;
+    const g = c.getContext("2d");
+    g.imageSmoothingEnabled = false;
+    g.drawImage(base(L, frame, flip), 0, 0, BW * S, BH * S);
+    if (bigCache.size > 120) bigCache.clear();
+    bigCache.set(k, c);
+    return c;
+  }
+  /* 현재 캔버스 변환에서 '기기 픽셀 배율'을 읽습니다 (폰의 화면 배율·관전 화면 확대 포함) */
+  function devScale(ctx) {
+    const m = ctx.getTransform ? ctx.getTransform() : null;
+    if (!m || typeof m.a !== "number" || !isFinite(m.a) || !isFinite(m.e) || m.b || m.c || m.a <= 0 || m.d <= 0) return null;   // 회전·뒤집기면 예전 방식으로
+    return m;
+  }
+  /* 1배 그림 img 를 기준점(ax, ay)이 화면의 (px, py)에 오도록, 기기 픽셀 기준 정수 배율로 찍습니다.
+     unit = 논리 크기(캐릭터는 키 40), size = 원하는 화면 크기 */
+  function blit(ctx, img, px, py, size, unit, ax, ay, tol) {
+    const m = devScale(ctx);
+    const ideal = m ? size * Math.abs(m.a) / unit : size / unit;
+    ctx.save();
+    if (m && ideal >= .75) {
+      let P = Math.max(1, Math.round(ideal));
+      if (tol != null && Math.abs(P - ideal) > ideal * tol) P = ideal;   // 정수로 맞추면 크기가 너무 달라질 땐 원래 크기로
+      const dx = Math.round(m.a * px + m.e - ax * P), dy = Math.round(m.d * py + m.f - ay * P);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, dx, dy, Math.round(img.width * P), Math.round(img.height * P));
+    } else {
+      const k = size / unit;
+      ctx.imageSmoothingEnabled = ideal < 1;           // 아주 작게 줄일 때만 부드럽게 (변환을 못 읽는 옛 브라우저는 도트 그대로)
+      if (ideal < 1) { try { ctx.imageSmoothingQuality = "high"; } catch (e) {} }
+      ctx.drawImage(img, px - ax * k, py - ay * k, img.width * k, img.height * k);
+    }
+    ctx.restore();
+  }
   /* 도트 주위에 어두운 테두리를 둘러 배경과 분리 */
   function outline(g, w, h, S) {
     const img = g.getImageData(0, 0, w, h), d = img.data;
@@ -348,30 +391,43 @@
     { body:"#4B2E7A", side:"#2E1A4E", lid:"#8A5CE0", lidL:"#C9A9FF", band:"#2E1A4E", lock:"#FF7BD5" },
     { body:"#B8860B", side:"#7A5800", lid:"#FFD166", lidL:"#FFF3C4", band:"#8A6400", lock:"#FFFFFF" },
   ];
-  function drawChest(ctx, x, y, size, tier, open) {
-    const c = CHEST[tier] || CHEST[0], S = size / 16, o = Math.max(0, Math.min(1, open || 0));
-    const P = (px, py, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x + (px - 8) * S), Math.round(y + (py - 12) * S), Math.ceil(w * S), Math.ceil(h * S)); };
-    ctx.imageSmoothingEnabled = false;
-    // 그림자
-    ctx.fillStyle = "rgba(0,0,0,.32)"; ctx.beginPath(); ctx.ellipse(x, y + 3 * S, 9 * S, 3 * S, 0, 0, 7); ctx.fill();
+  const chestCache = new Map();
+  function chestBase(tier, step) {                   // step = 열림 단계 0~6
+    const ck = tier + "_" + step;
+    let cv = chestCache.get(ck);
+    if (cv) return cv;
+    const C = CHEST[tier] || CHEST[0], o = step / 6;
+    cv = document.createElement("canvas"); cv.width = 20; cv.height = 20;   // 16칸 + 여백 (뚜껑이 위로 열림)
+    const g = cv.getContext("2d");
+    const P = (px, py, w, h, col) => { g.fillStyle = col; g.fillRect(Math.round(2 + px), Math.round(4 + py), Math.ceil(w), Math.ceil(h)); };
     // 몸통
-    P(2, 8, 12, 7, c.body); P(2, 8, 12, 7, "rgba(0,0,0,0)");
-    P(2, 8, 1, 7, c.side); P(13, 8, 1, 7, c.side); P(2, 14, 12, 1, c.side);
-    P(4, 8, 1, 7, c.band); P(11, 8, 1, 7, c.band);
-    if (o > 0) { P(3, 8, 10, 2, "#1A1200"); P(5, 9, 6, 1, c.lock === "#FFFFFF" ? "#FFD166" : "#FFD166"); }  // 열리면 안에 반짝
+    P(2, 8, 12, 7, C.body); P(2, 8, 12, 7, "rgba(0,0,0,0)");
+    P(2, 8, 1, 7, C.side); P(13, 8, 1, 7, C.side); P(2, 14, 12, 1, C.side);
+    P(4, 8, 1, 7, C.band); P(11, 8, 1, 7, C.band);
+    if (o > 0) { P(3, 8, 10, 2, "#1A1200"); P(5, 9, 6, 1, C.lock === "#FFFFFF" ? "#FFD166" : "#FFD166"); }  // 열리면 안에 반짝
     // 뚜껑 (열릴수록 위로·뒤로 젖혀짐)
     const lift = o * 6, tilt = o * 3;
-    P(2, 4 - lift, 12, 4 - tilt, c.lid); P(2, 4 - lift, 12, 1, c.lidL);
-    P(2, 4 - lift, 1, 4 - tilt, c.side); P(13, 4 - lift, 1, 4 - tilt, c.side);
-    P(4, 4 - lift, 1, 4 - tilt, c.band); P(11, 4 - lift, 1, 4 - tilt, c.band);
+    P(2, 4 - lift, 12, 4 - tilt, C.lid); P(2, 4 - lift, 12, 1, C.lidL);
+    P(2, 4 - lift, 1, 4 - tilt, C.side); P(13, 4 - lift, 1, 4 - tilt, C.side);
+    P(4, 4 - lift, 1, 4 - tilt, C.band); P(11, 4 - lift, 1, 4 - tilt, C.band);
     // 자물쇠
-    P(7, 7 - lift * .5, 2, 2, c.lock); P(7, 9, 2, 1, "#1A1200");
+    P(7, 7 - lift * .5, 2, 2, C.lock); P(7, 9, 2, 1, "#1A1200");
+    chestCache.set(ck, cv);
+    return cv;
+  }
+  function drawChest(ctx, x, y, size, tier, open) {
+    const S = size / 16, o = Math.max(0, Math.min(1, open || 0));
+    // 그림자
+    ctx.fillStyle = "rgba(0,0,0,.32)"; ctx.beginPath(); ctx.ellipse(x, y + 3 * S, 9 * S, 3 * S, 0, 0, 7); ctx.fill();
+    // 상자 (한 장짜리 그림을 기기 픽셀에 맞춰 찍어서 이음매·번짐 없음)
+    blit(ctx, chestBase(tier, Math.round(o * 6)), x, y, size, 16, 10, 16, .15);
     // 빛 (열렸을 때)
     if (o > 0) { ctx.globalAlpha = o * .8; ctx.fillStyle = "#FFF3C4";
       for (let k = 0; k < 5; k++) { const a = -1.6 + k * .55, r = 9 * S + o * 10 * S;
         ctx.fillRect(x + Math.cos(a) * r - S, y - 2 * S + Math.sin(a) * r - S, 2 * S, 2 * S); }
       ctx.globalAlpha = 1; }
   }
+
 
 
   /* ═══════ 타일셋: 종류별 4가지 변형을 미리 그려 두고, 보이는 칸만 찍습니다 (큰 맵용) ═══════ */
@@ -476,12 +532,22 @@
     const x0 = Math.max(0, Math.floor((camX - vw / 2 / k) / S) - 1), x1 = Math.min(W - 1, Math.ceil((camX + vw / 2 / k) / S) + 1);
     const y0 = Math.max(0, Math.floor((camY - vh / 2 / k) / S) - 1), y1 = Math.min(H - 1, Math.ceil((camY + vh / 2 / k) / S) + 1);
     const ox = vw / 2 - camX * k, oy = vh / 2 - camY * k, sz = S * k;
+    /* 타일 경계를 '기기 픽셀' 정수 위치에 맞춰 빈틈·겹침 없이 이어 붙입니다.
+       (1.5배·2.625배 같은 소수 화면 배율에서도 격자 줄이 생기지 않게) */
+    const M = devScale(ctx), a = M ? M.a : 1, d = M ? M.d : 1, e = M ? M.e : 0, f = M ? M.f : 0;
+    const ex = (x) => Math.round(e + a * (ox + x * sz)), ey = (y) => Math.round(f + d * (oy + y * sz));
+    ctx.save();
+    if (M) ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-      const v = t[y * W + x], px = ox + x * sz, py = oy + y * sz;
-      const variant = ((x * 7 + y * 13 + x * y) & 3);
-      ctx.drawImage(set[v] ? set[v][variant] : set[1][0], Math.round(px), Math.round(py), Math.ceil(sz), Math.ceil(sz));
+    for (let y = y0; y <= y1; y++) {
+      const py = ey(y), ph = ey(y + 1) - py;
+      for (let x = x0; x <= x1; x++) {
+        const v = t[y * W + x], px = ex(x), pw = ex(x + 1) - px;
+        const variant = ((x * 7 + y * 13 + x * y) & 3);
+        ctx.drawImage(set[v] ? set[v][variant] : set[1][0], px, py, pw, ph);
+      }
     }
+    ctx.restore();
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) paintEdges(ctx, at, x, y, t[y * W + x], ox + x * sz, oy + y * sz, S, k);
   }
   /* 전체 맵 축소본 (관전 화면 전체 보기용) */
@@ -498,11 +564,17 @@
     fox:     { name: "광야 여우",   xp: 30, color: "#FF9A3C" },
     locust:  { name: "메뚜기 떼",   xp: 10, color: "#9BDC3C" },
   };
-  function drawMinion(ctx, x, y, size, type, frame, flip) {
-    const S = Math.max(1, Math.round(size / 24));
-    const P = (px, py, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x + (flip ? -(px + w - 12) : (px - 12)) * S), Math.round(y - 24 * S + py * S), w * S, h * S); };
-    ctx.imageSmoothingEnabled = false;
+  const minCache = new Map();
+  function minionBase(type, frame, flip) {
     const hop = (frame % 2) ? 1 : 0;
+    const k = type + "_" + hop + "_" + (flip ? 1 : 0);
+    let c = minCache.get(k);
+    if (c) return c;
+    c = document.createElement("canvas");
+    c.width = 28; c.height = 28;                   // 24×24 + 테두리 여백 2
+    const g = c.getContext("2d");
+    g.imageSmoothingEnabled = false;
+    const P = (px, py, w, h, col) => { g.fillStyle = col; g.fillRect(2 + (flip ? 24 - px - w : px), 2 + py, w, h); };
     if (type === "fox") {
       P(4, 10 + hop, 14, 7, "#FF9A3C"); P(4, 15 + hop, 14, 2, "#E07A20");
       P(14, 6 + hop, 7, 6, "#FF9A3C"); P(15, 4 + hop, 2, 3, "#FF9A3C"); P(19, 4 + hop, 2, 3, "#FF9A3C");
@@ -516,10 +588,16 @@
       P(4, 10 + hop, 10, 2, "#D7F5A8"); P(2, 9 + hop, 6, 1, "#D7F5A8");
       P(7, 17 + hop, 1, 3, "#3E6E1E"); P(11, 17 + hop, 1, 3, "#3E6E1E"); P(14, 15 + hop, 3, 1, "#3E6E1E"); P(16, 13 + hop, 1, 3, "#3E6E1E");
       P(19, 8 + hop, 2, 1, "#3E6E1E"); P(20, 7 + hop, 1, 1, "#3E6E1E");
-    } else {
-      drawChar(ctx, x, y, size * 1.3, MINION.soldier.look, frame, flip);
     }
+    outline(g, 28, 28, 1);
+    minCache.set(k, c);
+    return c;
   }
+  function drawMinion(ctx, x, y, size, type, frame, flip) {
+    if (type !== "fox" && type !== "locust") return drawChar(ctx, x, y, size * 1.3, MINION.soldier.look, frame, flip);
+    blit(ctx, minionBase(type, frame, flip), x, y, 24 * Math.max(1, Math.round(size / 24)), 24, 14, 26);   // 예전과 같은 크기 (24의 정수배)
+  }
+
 
   /* ═══════ 보스 외형 ═══════ */
   const BOSS = {
@@ -536,12 +614,37 @@
   /** 캐릭터를 화면에 그립니다. px,py = 발밑 중심 좌표, size = 화면상 높이(px)
       frame: 0 서 있음 · 5 숨쉬기 · 1~4 걷기.  정수 배율 캐시를 원하는 크기로 맞춰 그립니다 */
   function drawChar(ctx, px, py, size, L, frame, flip) {
-    const S = Math.max(1, Math.round(size / 40));
-    const img = sprite(L, frame, flip, S);
-    const k = size / (40 * S);
-    const w = img.width * k, h = img.height * k;
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(img, Math.round(px - w / 2), Math.round(py - h + S * k), Math.round(w), Math.round(h));
+    blit(ctx, base(L, frame, flip), px, py, size, 40, AX, AY);
+  }
+  /* ── 작은 캔버스(초상화·목록 아이콘)를 화면 해상도에 맞춰 준비 ── */
+  const dprNow = () => Math.min(3, (typeof devicePixelRatio !== "undefined" && devicePixelRatio) || 1);
+  function hiCanvas(c, cssW, cssH) {
+    const d = dprNow();
+    const W = Math.max(1, Math.round(cssW * d)), H = Math.max(1, Math.round(cssH * d));
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+    if (c.style) { const sw = cssW + "px", sh = cssH + "px"; if (c.style.width !== sw) c.style.width = sw; if (c.style.height !== sh) c.style.height = sh; }
+    const g = c.getContext("2d");
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    return { g, W, H, d };
+  }
+  /* 상자 안에 캐릭터를 꽉 차게, 되도록 정수 배율로 또렷하게 그립니다.
+     opt.crop = "full"(전신, 발 아래 정렬) · "bust"(상반신) · "head"(얼굴) · opt.frame · opt.flip */
+  const CROPS = { full: [3, 1, 32, 44], bust: [4, 0, 30, 30], head: [7, 1, 24, 24] };
+  function portrait(c, cssW, cssH, L, opt) {
+    opt = opt || {};
+    const { g, W, H } = hiCanvas(c, cssW, cssH);
+    g.clearRect(0, 0, W, H);
+    const img = base(L, opt.frame || 0, !!opt.flip);
+    const crop = CROPS[opt.crop] ? opt.crop : "full", r = CROPS[crop];
+    let k = Math.min(W / r[2], H / r[3]) * (opt.scale || 1);
+    const ki = Math.floor(k);
+    if (ki >= 1 && ki / k >= .7) k = ki;             // 정수 배율로 (크기를 조금 양보)
+    g.imageSmoothingEnabled = k < 1;                  // 작게 줄일 때만 부드럽게
+    if (k < 1) { try { g.imageSmoothingQuality = "high"; } catch (e) {} }
+    const dw = Math.round(r[2] * k), dh = Math.round(r[3] * k);
+    const dx = Math.round((W - dw) / 2), dy = crop === "full" ? H - dh : Math.round((H - dh) / 2);
+    g.drawImage(img, r[0], r[1], r[2], r[3], dx, dy, dw, dh);
+    return g;
   }
   /** 걷는 중인지와 시간으로 프레임 번호를 고릅니다 */
   function animFrame(moving, walk, t) {
@@ -560,5 +663,5 @@
     ac: (+L?.ac || 0) % ACCENT.length, it: (+L?.it || 0) % ITEMS.length,
   });
 
-  root.PX = { SKIN, HAIR, CLOTH, ACCENT, HAIRS, GEARS, FITS, ITEMS, drawChar, animFrame, sprite, drawMap, drawTiles, drawMapScaled, tileset, drawChest, drawMinion, MINION, BOSS, SOLID: SOLID_T, randomLook, sanitize };
+  root.PX = { base, portrait, hiCanvas, dprNow, SKIN, HAIR, CLOTH, ACCENT, HAIRS, GEARS, FITS, ITEMS, drawChar, animFrame, sprite, drawMap, drawTiles, drawMapScaled, tileset, drawChest, drawMinion, MINION, BOSS, SOLID: SOLID_T, randomLook, sanitize };
 })(typeof window !== "undefined" ? window : globalThis);
