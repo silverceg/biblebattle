@@ -93,7 +93,7 @@ aside{border-left:3px solid var(--deep);background:linear-gradient(180deg,#1F335
 .du .t{margin-left:auto;color:var(--violet)}
 
 /* 대결 중계창 */
-.cast{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);width:min(74%,900px);
+.cast{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);width:min(74%,900px);z-index:7;   /* 노트북 화면에서 접속 QR 상자가 중계창 글자를 가리지 않게 (QR 그림은 왼쪽에 그대로 보임) */
       background:linear-gradient(180deg,rgba(36,57,106,.96),rgba(27,45,79,.96));
       border:3px solid var(--gold);border-radius:20px;box-shadow:0 8px 0 rgba(0,0,0,.35),0 14px 40px rgba(0,0,0,.6);padding:12px 14px;display:none}
 .cast .stage{display:grid;grid-template-columns:150px 1fr 150px;gap:14px;align-items:center}
@@ -152,13 +152,13 @@ aside{border-left:3px solid var(--deep);background:linear-gradient(180deg,#1F335
 @keyframes popOut{to{opacity:0;transform:translateY(-10px)}}
 
 /* 카운트다운 */
-.cd{position:absolute;inset:0;display:none;place-items:center;background:rgba(10,7,19,.75);z-index:8}
+.cd{position:absolute;top:0;right:0;bottom:0;left:0;display:none;place-items:center;background:rgba(10,7,19,.75);z-index:8}
 .cd.on{display:grid}
 .cd .n{font-size:150px;color:var(--gold);text-shadow:6px 6px 0 var(--deep);animation:cdp .9s infinite}
 @keyframes cdp{0%{transform:scale(1.3);opacity:.4}40%{transform:scale(1);opacity:1}}
 
 /* 대기실 */
-.lobby{position:absolute;inset:0;background:var(--bg);display:flex;flex-direction:column;padding:18px 24px;overflow:hidden}
+.lobby{position:absolute;top:0;right:0;bottom:0;left:0;background:var(--bg);display:flex;flex-direction:column;padding:18px 24px;overflow:hidden}
 .lobby-head{display:flex;gap:28px;align-items:center;flex-shrink:0}
 .lobby h1{font-size:clamp(24px,3vw,42px);line-height:1.35;text-shadow:3px 3px 0 var(--deep)}
 .lobby h1 em{font-style:normal;color:var(--gold)}
@@ -191,7 +191,7 @@ aside{border-left:3px solid var(--deep);background:linear-gradient(180deg,#1F335
 .who .n{font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* QR 크게 */
-.qrbig{position:absolute;inset:0;background:rgba(10,7,19,.96);display:none;place-items:center;z-index:20;cursor:pointer}
+.qrbig{position:absolute;top:0;right:0;bottom:0;left:0;background:rgba(10,7,19,.96);display:none;place-items:center;z-index:20;cursor:pointer}
 .qrbig.on{display:grid}
 .qrbig .box{text-align:center}
 .qrbig img{width:min(58vh,560px);height:min(58vh,560px);background:#fff;padding:14px;border:4px solid var(--gold)}
@@ -199,7 +199,7 @@ aside{border-left:3px solid var(--deep);background:linear-gradient(180deg,#1F335
 .qrbig .h{font-size:14px;color:var(--dim);margin-top:8px}
 
 /* 종료 */
-.final{position:absolute;inset:0;background:rgba(16,12,28,.98);display:none;flex-direction:column;padding:18px 24px;overflow-y:auto;z-index:12}
+.final{position:absolute;top:0;right:0;bottom:0;left:0;background:rgba(16,12,28,.98);display:none;flex-direction:column;padding:18px 24px;overflow-y:auto;z-index:12}
 .final.on{display:flex}
 .final h2{font-size:clamp(24px,3vw,40px);color:var(--gold);text-align:center;text-shadow:3px 3px 0 var(--deep)}
 .pod{display:flex;gap:12px;align-items:flex-end;justify-content:center;margin:12px 0}
@@ -230,9 +230,9 @@ aside{border-left:3px solid var(--deep);background:linear-gradient(180deg,#1F335
 @media (prefers-reduced-motion:reduce){.track{animation-duration:100s}}
 
 /* ══ 게임 연출 ══ */
-body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:200;
+body::before{content:"";position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:200;
   background:repeating-linear-gradient(0deg,rgba(0,0,0,.1) 0 1px,transparent 1px 4px);opacity:.35}
-body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:199;
+body::after{content:"";position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:199;
   box-shadow:inset 0 0 160px rgba(10,7,19,.85)}
 @keyframes glowPulse{0%,100%{text-shadow:2px 2px 0 var(--deep),0 0 8px rgba(255,209,102,.5)}
   50%{text-shadow:2px 2px 0 var(--deep),0 0 18px rgba(255,209,102,.95)}}
@@ -274,7 +274,7 @@ body.lite .rk.t1,body.lite .logo,body.lite .top,body.lite .ticker,body.lite .du.
 .cast.enter .vsbig{animation:vsB .6s .3s cubic-bezier(.2,1.8,.4,1) both}
 @keyframes vsB{0%{transform:translateX(-50%) scale(0) rotate(-20deg);opacity:0}60%{opacity:1}100%{transform:translateX(-50%) scale(1);opacity:1}}
 @keyframes castIn{from{transform:translateY(20px) scale(.94);opacity:0}}
-.cast::before{content:"";position:absolute;inset:-3px;border:3px solid var(--gold);opacity:.45;
+.cast::before{content:"";position:absolute;top:-3px;right:-3px;bottom:-3px;left:-3px;border:3px solid var(--gold);opacity:.45;
   animation:castRing 1.5s ease-in-out infinite;pointer-events:none}
 @keyframes castRing{0%,100%{opacity:.2}50%{opacity:.7}}
 .pop{animation:popIn .34s cubic-bezier(.2,1.8,.4,1), popOut .5s 2.3s forwards}
@@ -285,7 +285,7 @@ body.lite .rk.t1,body.lite .logo,body.lite .top,body.lite .ticker,body.lite .du.
   15%{transform:translate(-7px,3px)}30%{transform:translate(6px,-4px)}
   45%{transform:translate(-5px,-2px)}60%{transform:translate(4px,3px)}80%{transform:translate(-2px,1px)}}
 .ticker{position:relative}
-.ticker::after{content:"";position:absolute;inset:0;pointer-events:none;
+.ticker::after{content:"";position:absolute;top:0;right:0;bottom:0;left:0;pointer-events:none;
   background:linear-gradient(90deg,rgba(255,255,255,.35),transparent 22%);
   animation:shine 3.4s linear infinite}
 @keyframes shine{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
@@ -357,9 +357,9 @@ body.lite .rk.t1,body.lite .logo,body.lite .top,body.lite .ticker,body.lite .du.
 .rk .nm2 .nm{flex:initial}
 @media (prefers-reduced-motion:reduce){*{animation:none !important}}
 /* ══ 오프닝 ══ */
-.opening{position:absolute;inset:0;z-index:30;background:radial-gradient(1000px 600px at 50% 30%,#1E3562,#0B1426 70%);display:grid;place-items:center;overflow:hidden}
+.opening{position:absolute;top:0;right:0;bottom:0;left:0;z-index:30;background:radial-gradient(1000px 600px at 50% 30%,#1E3562,#0B1426 70%);display:grid;place-items:center;overflow:hidden}
 .opening.off{display:none}
-.opening .rays{position:absolute;inset:-40%;opacity:.12;color:var(--gold);background:repeating-conic-gradient(from 0deg,currentColor 0 6deg,transparent 6deg 18deg);animation:spin 30s linear infinite}
+.opening .rays{position:absolute;top:-40%;right:-40%;bottom:-40%;left:-40%;opacity:.12;color:var(--gold);background:repeating-conic-gradient(from 0deg,currentColor 0 6deg,transparent 6deg 18deg);animation:spin 30s linear infinite}
 .opening .big{font-family:var(--px);font-size:min(12vw,120px);line-height:1;color:var(--gold);text-shadow:6px 6px 0 var(--deep),0 0 40px rgba(255,201,60,.5);text-align:center}
 .opening .big span{display:inline-block;animation:drop .6s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes drop{from{transform:translateY(-160px) rotate(-8deg);opacity:0}}
@@ -370,13 +370,13 @@ body.lite .rk.t1,body.lite .logo,body.lite .top,body.lite .ticker,body.lite .du.
 .opening .tap{font-family:var(--px);font-size:18px;color:var(--dim);text-align:center;margin-top:20px;opacity:0;animation:fadeUp .5s 1.4s forwards,pulse 1.2s 2s infinite}
 @keyframes pulse{50%{opacity:.4}}
 /* ══ 엔딩 ══ */
-.ending{position:absolute;inset:0;z-index:14;background:rgba(6,10,20,.96);display:none;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+.ending{position:absolute;top:0;right:0;bottom:0;left:0;z-index:14;background:rgba(6,10,20,.96);display:none;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
 .ending.on{display:flex}
 .ending .banner{font-family:var(--px);font-size:min(9vw,84px);color:var(--gold);text-shadow:5px 5px 0 var(--deep),0 0 40px rgba(255,201,60,.6);animation:bIn .6s cubic-bezier(.2,1.8,.4,1)}
 @keyframes bIn{from{transform:scale(.2) rotate(-12deg);opacity:0}}
 .ending canvas{margin-top:10px}
 .ending .hint{font-size:14px;color:var(--dim);font-weight:700;margin-top:10px}
-.confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.confetti{position:absolute;top:0;right:0;bottom:0;left:0;pointer-events:none;overflow:hidden}
 .confetti i{position:absolute;top:-14px;width:10px;height:16px;animation:cf linear forwards}
 @keyframes cf{to{transform:translateY(110vh) rotate(720deg)}}
 .hide{display:none !important}
@@ -393,7 +393,9 @@ body.lite .rk.t1,body.lite .logo,body.lite .top,body.lite .ticker,body.lite .du.
   function show(m,t,live){var b=document.getElementById("fatal");if(!b)return;var now=Date.now();
     if(live&&(now<muteUntil||now-lastAt<60000))return;lastAt=now;
     b.style.display="block";b.style.cursor="pointer";
-    b.innerHTML="<b>"+(live?"화면 오류가 한 번 있었습니다 — 게임은 계속 진행됩니다":"화면을 띄우지 못했습니다")+"</b><br>"+m+(t?"<br><br>"+t:"")+"<div style='opacity:.75;font-size:12px;margin-top:4px'>눌러서 닫기</div>";
+    var ua=navigator.userAgent||"",sv=/Version\/([\d.]+).*Safari/.exec(ua),saf=sv&&!/Chrome|Chromium|CriOS|FxiOS|Edg/.test(ua);
+    var tip=saf?"<br><span style='font-size:12px;opacity:.85'>브라우저: Safari "+sv[1]+(parseFloat(sv[1])<16.4?" (오래된 버전) — 맥은 크롬(Chrome)으로 열면 가장 확실합니다":"")+"</span>":"";
+    b.innerHTML="<b>"+(live?"화면 오류가 한 번 있었습니다 — 게임은 계속 진행됩니다":"화면을 띄우지 못했습니다")+"</b><br>"+m+(t?"<br><br>"+t:"")+tip+"<div style='opacity:.75;font-size:12px;margin-top:4px'>눌러서 닫기</div>";
     b.onclick=function(){b.style.display="none";muteUntil=Date.now()+60000;};
     clearTimeout(hideT);if(live)hideT=setTimeout(function(){b.style.display="none";},8000);}
   window.addEventListener("error",function(e){
@@ -412,6 +414,34 @@ body.lite .rk.t1,body.lite .logo,body.lite .top,body.lite .ticker,body.lite .du.
     else if(typeof PX.drawMap!=="function")
       show("옛 버전의 sprite.js 가 브라우저에 남아 있습니다.",
            "키보드로 <b>Ctrl+Shift+R</b> (맥은 Cmd+Shift+R) 을 눌러 강제 새로고침해 주세요.");});
+})();
+</script>
+<script>
+/* 옛 브라우저 보완 — 맥 Safari 15 이하에는 '둥근 사각형 그리기'(roundRect)가 없어 지도 그리기가 멈춥니다. 없으면 채워 넣습니다. */
+(function(){
+  function rr(x, y, w, h, r){
+    if (w < 0) { x += w; w = -w; } if (h < 0) { y += h; h = -h; }
+    var v = r == null ? [0] : (typeof r === "object" && r.length != null) ? r : [r], n = [], i, q;
+    for (i = 0; i < v.length && i < 4; i++) { q = v[i]; n.push(Math.max(0, +(q && typeof q === "object" ? q.x : q) || 0)); }
+    if (!n.length) n = [0];
+    var a = n.length === 1 ? [n[0], n[0], n[0], n[0]] : n.length === 2 ? [n[0], n[1], n[0], n[1]] : n.length === 3 ? [n[0], n[1], n[2], n[1]] : n;
+    var f = 1, s;
+    s = a[0] + a[1]; if (s > w) f = Math.min(f, w / s);
+    s = a[1] + a[2]; if (s > h) f = Math.min(f, h / s);
+    s = a[2] + a[3]; if (s > w) f = Math.min(f, w / s);
+    s = a[3] + a[0]; if (s > h) f = Math.min(f, h / s);
+    if (f < 1) for (i = 0; i < 4; i++) a[i] *= f;
+    this.moveTo(x + a[0], y);
+    this.arcTo(x + w, y, x + w, y + h, a[1]);
+    this.arcTo(x + w, y + h, x, y + h, a[2]);
+    this.arcTo(x, y + h, x, y, a[3]);
+    this.arcTo(x, y, x + w, y, a[0]);
+    this.closePath(); this.moveTo(x, y);
+  }
+  try {
+    if (window.CanvasRenderingContext2D && !CanvasRenderingContext2D.prototype.roundRect) CanvasRenderingContext2D.prototype.roundRect = rr;
+    if (window.Path2D && Path2D.prototype && !Path2D.prototype.roundRect) Path2D.prototype.roundRect = rr;
+  } catch (e) {}
 })();
 </script>
 
@@ -509,8 +539,8 @@ body.lite .rk.t1,body.lite .logo,body.lite .top,body.lite .ticker,body.lite .du.
 <div class="ticker"><div class="bd" id="tb">현재 순위</div><div class="track" id="track"></div></div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/sprite.js?v=27"></script>
-<script src="/audio.js?v=27"></script>
+<script src="/sprite.js?v=28"></script>
+<script src="/audio.js?v=28"></script>
 <script>
 const $ = (i) => document.getElementById(i);
 /* 바뀔 때만 화면 글자를 고칩니다 — 같은 글자를 매 프레임 다시 쓰면 브라우저가 매번 화면 배치를 다시 계산해 느려집니다 */
@@ -552,7 +582,7 @@ const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;","
 const bossLook = (t) => (PX.BOSS[t] || PX.BOSS.goliath).look;
 const openings = [];
 
-socket.on("connect", () => socket.emit("host:join"));
+socket.on("connect", () => { socket.emit("host:join"); loadMap(); });   // 다시 연결될 때도 지도를 새로 (끊긴 사이 바뀌었을 수 있음)
 socket.on("roster", (r) => { roster = new Map(r.list.map(p => [p.u, p])); TEAMS = r.teams || []; MODE = r.mode; });
 let wQueue = [], srvSkew = null;                   // srvSkew: (받은 시각 − 서버가 보낸 시각)의 최솟값 → 서버 시계 추정
 socket.on("world", (w) => {
@@ -655,15 +685,20 @@ fetch("/api/join-info?u=" + encodeURIComponent(location.origin)).then(r => r.jso
 });
 
 /* ── 지형 (그리기는 sprite.js 의 PX.drawMap 이 담당) ── */
-function loadMap(){
-  fetch("/api/map").then(r => r.json()).then(m => {
+let mapLoading = false, mapRetryT = 0, mapTries = 0;
+function loadMap(){                                              // 실패하면 곧 다시 받습니다 (서버가 막 깨어나는 중일 때 등)
+  if (mapLoading) return; mapLoading = true; clearTimeout(mapRetryT); mapRetryT = 0;
+  fetch("/api/map", { cache: "no-store" }).then(r => { if (!r.ok) throw new Error("지도 " + r.status); return r.json(); }).then(m => {
+    if (!m || !m.tiles || !m.TW || !m.TH || !m.TS) throw new Error("지도 자료 이상");
     const bin = atob(m.tiles), t = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) t[i] = bin.charCodeAt(i);
-    MAPI = { ...m, t };
+    if (t.length < m.TW * m.TH) throw new Error("지도 크기 이상");
+    MAPI = { ...m, t }; mapTries = 0;
     mapCv = null; mapK = 0;                                      // 전체 보기용 축소본은 fit()에서 화면 해상도에 맞춰 만듭니다
     PX.tileset(m.TS);
     fit();
-  });
+  }).catch(() => { mapTries++; clearTimeout(mapRetryT); mapRetryT = setTimeout(() => { mapRetryT = 0; loadMap(); }, Math.min(3000, 600 * mapTries)); })
+    .then(() => { mapLoading = false; });
 }
 loadMap();
 let fitTick = 0, fitAW = 0, fitAH = 0;
@@ -831,6 +866,16 @@ function handleFx(list){
 let fpsN = 0, fpsT0 = performance.now(), slowSecs = 0;
 function draw(){
   requestAnimationFrame(draw);
+  try { drawFrame(); } catch (e) { drawFail(e); }
+}
+/* 그리기 도중 예상 못 한 오류가 나도 다음 장면은 멀쩡하게: 쌓인 저장 상태를 모두 풀고 기본값으로 되돌림 */
+let drawErrAt = 0;
+function drawFail(e){
+  try { for (let i = 0; i < 64; i++) cx.restore(); cx.setTransform(1, 0, 0, 1, 0, 0); cx.globalAlpha = 1; cx.globalCompositeOperation = "source-over"; cx.setLineDash([]); } catch (_) {}
+  const now = Date.now();
+  if (now - drawErrAt > 60000) { drawErrAt = now; console.error("[관전 그리기 오류]", e); setTimeout(() => { throw e; }); }
+}
+function drawFrame(){
   pumpWorld();
   if (!Wd) return;
   fpsN++; { const pn = performance.now(); if (pn - fpsT0 >= 1000) { const fps = fpsN * 1000 / (pn - fpsT0); fpsN = 0; fpsT0 = pn;
@@ -1191,7 +1236,10 @@ function updateBar(){
   const want = lob || Wd.ph === "ended" ? "lobby"
              : judge || (Wd.feat && Wd.feat.boss) ? "boss"
              : Wd.stg === "flood" ? "duel" : "play";               // 공격은 늘 여러 개라 음악은 단계로만 바꿈
-  if (want !== lastPh) { lastPh = want; SFX.music(want); }
+  if (want !== lastPh) {                                         // 보스 중계가 켜졌다 꺼졌다 할 때마다 곡이 바뀌지 않게 (20초는 유지)
+    const hard = want === "lobby" || lastPh === "lobby" || !lastPh || judge;
+    if (hard || Date.now() - (updateBar.musAt || 0) > 20000) { lastPh = want; updateBar.musAt = Date.now(); SFX.music(want); }
+  }
   if (Wd.ph === "playing") {
     SFX.setIntensity(judge ? 1.3 : Wd.t <= 30 ? 1.3 : Wd.t <= 60 ? 1.18 : Wd.stg === "flood" ? 1.1 : 1);
     if (judge) {
@@ -1712,14 +1760,25 @@ $("m-season").onclick = async () => {
 SFX.restore();
 $("m-sound").textContent = SFX.enabled ? "🔊" : "🔇";
 $("m-sound").onclick = () => { const v = SFX.toggle(); $("m-sound").textContent = v ? "🔊" : "🔇"; if (v) SFX.play("click"); };
+addEventListener("pointerdown", () => SFX.init(), { capture: true, passive: true });   // 브라우저가 음악 재생을 막았으면 선생님이 화면을 누를 때 다시 틀기
 ["click","keydown","pointerdown"].forEach(ev =>
   addEventListener(ev, function once(){ SFX.init(); if (Wd) SFX.music(Wd.ph === "playing" ? "play" : "lobby");
     removeEventListener(ev, once); }, { once: true }));
 $("m-full").onclick = full;
-function full(){ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(()=>{}); }
+/* 전체화면: 맥 Safari 16.3 이하는 webkit 이름만 있음 */
+function full(){
+  const d = document, el = d.documentElement;
+  try {
+    let r;
+    if (d.fullscreenElement || d.webkitFullscreenElement) { const ex = d.exitFullscreen || d.webkitExitFullscreen || d.webkitCancelFullScreen; r = ex && ex.call(d); }
+    else { const rq = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen; r = rq && rq.call(el); }
+    if (r && r.catch) r.catch(() => {});
+  } catch (_) {}
+}
 addEventListener("keydown", e => {
-  if (e.key === "f" || e.key === "F") full();
-  if (e.key === "p" || e.key === "P") $("perf").classList.toggle("hide");
+  const typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  if (!typing && !e.metaKey && !e.ctrlKey && (e.code === "KeyF" || e.key === "f" || e.key === "F")) full();   // 한글 입력 상태(ㄹ)에서도 F 키로
+  if (!typing && !e.metaKey && !e.ctrlKey && (e.code === "KeyP" || e.key === "p" || e.key === "P")) $("perf").classList.toggle("hide");
   if (e.key === "Escape") { $("qrbig").classList.remove("on"); goOverview(); }
 });
 </script>
