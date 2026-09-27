@@ -260,7 +260,7 @@
     el.loop = name !== "victory"; el.volume = 0; el.preload = "auto";
     try { el.preservesPitch = true; el.mozPreservesPitch = true; } catch {}
     el.playbackRate = intensity;
-    el.play().catch(() => {});                 // 화면을 아직 안 눌렀으면 조용히 실패 → 다음 호출 때 다시
+    if (on) el.play().catch(() => {});         // 화면을 아직 안 눌렀으면 조용히 실패 → 선생님이 화면을 누를 때 다시
     mp3El = el; mp3Track = name;
     clearInterval(mp3Fade);
     mp3Fade = setInterval(() => { if (!mp3El) return clearInterval(mp3Fade); mp3El.volume = Math.min(on ? MP3_VOL : 0, mp3El.volume + .04); if (mp3El.volume >= (on ? MP3_VOL : 0)) clearInterval(mp3Fade); }, 50);
@@ -275,7 +275,7 @@
     if (name === cur) return;
     cur = name;
     // 승리 곡(victory.mp3)이 나오는 중이면 끝난 뒤에 시작 — 두 곡이 겹치지 않게
-    if (victoryEl && !victoryEl.ended && !victoryEl.paused) { pendingTrack = name; stopMp3(.4); fade(0, .3); clearInterval(timer); timer = null; return; }
+    if (victoryEl && !victoryEl.ended) { pendingTrack = name; stopMp3(.4); fade(0, .3); clearInterval(timer); timer = null; return; }
     const src = name && pickMp3(name);
     if (src) {                                  // mp3 가 있으면 8비트를 끄고 mp3
       fade(0, .4); clearInterval(timer); timer = null;
@@ -293,7 +293,8 @@
     const src = pickMp3("victory"); if (!src) return false;
     if (victoryEl && !victoryEl.ended) return true;               // 이미 나오는 중이면 겹치지 않게
     stopMp3(.3); fade(0, .3); clearInterval(timer); timer = null; // 배경음악 정지
-    const el = new Audio(blobUrl[src] || src); el.volume = on ? MP3_VOL : 0; el.play().catch(() => {});
+    const el = new Audio(blobUrl[src] || src); el.volume = on ? MP3_VOL : 0;
+    if (on) el.play().catch((e) => { if (e && e.name === "NotAllowedError") setTimeout(() => el.onended && el.onended(), 0); });
     victoryEl = el; pendingTrack = cur;
     const done = () => { if (victoryEl !== el) return; victoryEl = null; const nx = pendingTrack; pendingTrack = null;
       if (nx) { cur = null; music(nx); } };
@@ -314,7 +315,7 @@
     get enabled() { return on; },
     init(){ boot(); resume(); if (on && mp3El && mp3El.paused) mp3El.play().catch(() => {}); },
     get usingMp3(){ return !!mp3Track; },
-    play(n){ if (!on || !boot()) return; resume(); if (n === "fanfare" && fanfareMp3()) return; const f = FX[n]; if (f) f(); },
+    play(n, o){ if (!on || !boot()) return; resume(); if (n === "fanfare" && !(o && o.short) && fanfareMp3()) return; const f = FX[n]; if (f) f(); },
     music,
     /* 배경음악 켜기/끄기 — 폰은 끔: 50~60대가 큰 음악 파일을 동시에 받으면 와이파이·서버가 막혀 게임이 멈춥니다 (음악은 메인 화면에서) */
     setMusic(v){ bgmOn = !!v; if (!bgmOn) music(null); },

@@ -551,6 +551,7 @@ const wantDPR = () => LITE ? 1 : Math.min(2, window.devicePixelRatio || 1);
 const socket = io({ transports: ["websocket", "polling"] });
 socket.on("connect_error", () => { socket.io.opts.transports = ["polling", "websocket"]; });   // 웹소켓이 막힌 곳이면 예전 방식으로
 const cv = $("cv"), cx = cv.getContext("2d");
+let mapLoading = false, mapRetryT = 0, mapTries = 0, mapAgain = false, mapWant = null;
 let MAPI = null, mapCv = null, mapK = 0, VW = 0, VH = 0, DPR = 1, Wd = null, MT = null, roster = new Map(), TEAMS = [], MODE = "solo";
 let tickCache = "", lastCd = -1, joinInfo = null, EMOTES = [];
 function drawEmote(x, y, idx){ const txt = EMOTES[idx - 1]; if (!txt) return;
@@ -582,13 +583,14 @@ const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;","
 const bossLook = (t) => (PX.BOSS[t] || PX.BOSS.goliath).look;
 const openings = [];
 
-socket.on("connect", () => { socket.emit("host:join"); loadMap(); });   // 다시 연결될 때도 지도를 새로 (끊긴 사이 바뀌었을 수 있음)
+socket.on("connect", () => socket.emit("host:join"));
 socket.on("roster", (r) => { roster = new Map(r.list.map(p => [p.u, p])); TEAMS = r.teams || []; MODE = r.mode; });
 let wQueue = [], srvSkew = null;                   // srvSkew: (받은 시각 − 서버가 보낸 시각)의 최솟값 → 서버 시계 추정
 socket.on("world", (w) => {
   const at = Date.now();
   if (w.st) { const sk = at - w.st; srvSkew = srvSkew == null || sk < srvSkew ? sk : srvSkew + (sk - srvSkew) * .01; }
   wQueue.push(w); if (wQueue.length > 12) wQueue.shift();
+  if (w.mapSeq != null) { mapWant = w.mapSeq; if (MAPI && MAPI.seq != null && MAPI.seq !== w.mapSeq && !mapLoading && !mapRetryT) loadMap(); }   // 끊긴 사이 지도가 바뀌었으면 다시 받기
 });
 const srvNow = () => srvSkew == null ? Date.now() : Date.now() - srvSkew;
 function pumpWorld(){
@@ -685,10 +687,16 @@ fetch("/api/join-info?u=" + encodeURIComponent(location.origin)).then(r => r.jso
 });
 
 /* ── 지형 (그리기는 sprite.js 의 PX.drawMap 이 담당) ── */
-let mapLoading = false, mapRetryT = 0, mapTries = 0;
 function loadMap(){                                              // 실패하면 곧 다시 받습니다 (서버가 막 깨어나는 중일 때 등)
-  if (mapLoading) return; mapLoading = true; clearTimeout(mapRetryT); mapRetryT = 0;
-  fetch("/api/map", { cache: "no-store" }).then(r => { if (!r.ok) throw new Error("지도 " + r.status); return r.json(); }).then(m => {
+  if (mapLoading) { mapAgain = true; return; }                  // 받는 중에 지도가 바뀌면 끝난 뒤 한 번 더
+  mapLoading = true; mapAgain = false; clearTimeout(mapRetryT); mapRetryT = 0;
+  let over = false;
+  const ctl = window.AbortController ? new AbortController() : null;
+  const fail = () => { if (over) return; over = true; clearTimeout(to); mapLoading = false; mapTries++;
+    mapRetryT = setTimeout(() => { mapRetryT = 0; loadMap(); }, Math.min(3000, 600 * mapTries)); };
+  const to = setTimeout(() => { try { ctl && ctl.abort(); } catch (e) {} fail(); }, 8000);           // 8초 안에 안 오면 다시
+  fetch("/api/map", ctl ? { cache: "no-store", signal: ctl.signal } : { cache: "no-store" }).then(r => { if (!r.ok) throw new Error("지도 " + r.status); return r.json(); }).then(m => {
+    if (over) return;
     if (!m || !m.tiles || !m.TW || !m.TH || !m.TS) throw new Error("지도 자료 이상");
     const bin = atob(m.tiles), t = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) t[i] = bin.charCodeAt(i);
@@ -696,9 +704,10 @@ function loadMap(){                                              // 실패하면
     MAPI = { ...m, t }; mapTries = 0;
     mapCv = null; mapK = 0;                                      // 전체 보기용 축소본은 fit()에서 화면 해상도에 맞춰 만듭니다
     PX.tileset(m.TS);
+    over = true; clearTimeout(to); mapLoading = false;
     fit();
-  }).catch(() => { mapTries++; clearTimeout(mapRetryT); mapRetryT = setTimeout(() => { mapRetryT = 0; loadMap(); }, Math.min(3000, 600 * mapTries)); })
-    .then(() => { mapLoading = false; });
+    if (mapAgain || (mapWant != null && m.seq != null && m.seq !== mapWant)) { mapAgain = false; setTimeout(loadMap, 100); }
+  }).catch(fail);
 }
 loadMap();
 let fitTick = 0, fitAW = 0, fitAH = 0;
@@ -1232,6 +1241,7 @@ let lastJTick = -1;
 const mmss = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
 function updateBar(){
   const lob = Wd.ph === "lobby", judge = Wd.stg === "judge" && Wd.ph !== "lobby" && Wd.ph !== "ended", zn = Wd.zn;
+  if (lob && $("cast").classList.contains("on")) { $("cast").classList.remove("on"); castKey = ""; }
   // 상황에 맞는 배경음악
   const want = lob || Wd.ph === "ended" ? "lobby"
              : judge || (Wd.feat && Wd.feat.boss) ? "boss"
@@ -1509,7 +1519,7 @@ function paintMeta(m){
   if (m.opened && m.opened.length) openedFx(m.opened);
   (m.events || []).forEach(e => {
     popup(e.text, e.tone);
-    if (e.tone === "gold") { SFX.play("fanfare"); shake(380); }
+    if (e.tone === "gold") { SFX.play("fanfare", { short: true }); shake(380); }
     else if (e.tone === "hot") { SFX.play("boss"); shake(300); }
     else if (e.tone === "warn") { SFX.play("warn"); shake(500); }
     else if (e.tone === "win") SFX.play("coin");
@@ -1762,7 +1772,7 @@ $("m-sound").textContent = SFX.enabled ? "🔊" : "🔇";
 $("m-sound").onclick = () => { const v = SFX.toggle(); $("m-sound").textContent = v ? "🔊" : "🔇"; if (v) SFX.play("click"); };
 addEventListener("pointerdown", () => SFX.init(), { capture: true, passive: true });   // 브라우저가 음악 재생을 막았으면 선생님이 화면을 누를 때 다시 틀기
 ["click","keydown","pointerdown"].forEach(ev =>
-  addEventListener(ev, function once(){ SFX.init(); if (Wd) SFX.music(Wd.ph === "playing" ? "play" : "lobby");
+  addEventListener(ev, function once(){ SFX.init(); if (Wd) SFX.music(lastPh || (Wd.ph === "playing" ? "play" : "lobby"));
     removeEventListener(ev, once); }, { once: true }));
 $("m-full").onclick = full;
 /* 전체화면: 맥 Safari 16.3 이하는 webkit 이름만 있음 */

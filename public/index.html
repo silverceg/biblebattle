@@ -109,6 +109,9 @@ body.forceland .rotate{display:none !important}
 body.forceland #app,body.forceland .splash,body.forceland .helpbox{position:fixed;top:0;left:0;right:auto;bottom:auto;width:var(--fw,100vh);height:var(--fh,100vw);
   transform-origin:top left;transform:rotate(90deg) translateY(calc(-1 * var(--fh,100vw)))}
 body.forceland #app{display:flex !important}
+/* 돌린 화면에선 '세로 스크롤'이 실제로는 옆으로 미는 동작 → pan-y 만 허용하면 스크롤이 막힘 (규칙 창을 못 닫던 문제) */
+body.forceland .rowgrid,body.forceland .helpbox,body.forceland .qpanel,body.forceland .lg-who .list,body.forceland .panes,body.forceland .praypick .list{touch-action:pan-x pan-y}
+body.forceland #fatal{left:0;right:auto;top:0;width:var(--fw,100vh);transform-origin:top left;transform:rotate(90deg) translateY(calc(-1 * var(--fh,100vw)))}
 
 #app{position:fixed;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;padding-left:var(--safeL);padding-right:var(--safeR);
      background:radial-gradient(900px 500px at 50% -10%,#1E3562,transparent 70%),var(--bg)}
@@ -151,6 +154,7 @@ input:focus{outline:none;border-color:var(--yellow)}
 .helpbox{position:fixed;top:0;right:0;bottom:0;left:0;z-index:80;background:rgba(6,10,20,.96);display:none;padding:14px;overflow-y:auto;touch-action:pan-y}
 .helpbox.on{display:block}
 .helpbox .grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#helpclose{position:sticky;bottom:0;z-index:2;box-shadow:0 -8px 16px rgba(6,10,20,.9)}   /* 닫기 버튼은 늘 화면 아래에 보이게 */
 .hi{display:flex;gap:8px;background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:7px 9px;font-size:11px;color:var(--dim);line-height:1.5}
 .hi b{color:#fff;font-family:var(--dp);font-weight:400;font-size:12px}
 
@@ -416,7 +420,7 @@ input:focus{outline:none;border-color:var(--yellow)}
 .result.win .banner{background:linear-gradient(180deg,#8CF0BD,var(--green) 50%,#1FA86A);color:#fff;text-shadow:2px 2px 0 var(--line);box-shadow:0 8px 0 #0E6B41}
 .result.lose .banner{background:linear-gradient(180deg,#FF8A94,var(--red) 50%,#B81E2D);color:#fff;text-shadow:2px 2px 0 var(--line);box-shadow:0 8px 0 #7A0F1B}
 .result.draw .banner{background:linear-gradient(180deg,#8ED0FF,var(--blue) 50%,#1478D2);color:#fff;text-shadow:2px 2px 0 var(--line);box-shadow:0 8px 0 #0B4F8F}
-.rside{position:relative;display:flex;flex-direction:column;gap:8px;align-items:center;max-width:52vw}
+.rside{position:relative;display:flex;flex-direction:column;gap:8px;align-items:center;max-width:calc(52 * var(--vw, 1vw))}
 .gain{font-family:var(--dp);font-size:30px;color:var(--yellow)}
 .gain.neg{color:var(--red)}
 .ans{padding:10px 14px;font-size:12px;color:var(--dim);line-height:1.6;text-align:left}
@@ -485,7 +489,7 @@ input:focus{outline:none;border-color:var(--yellow)}
 .cards.on{display:flex}
 .cards h3{font-family:var(--dp);font-size:24px;color:var(--teal);text-shadow:2px 2px 0 var(--line)}
 .cards .row3{display:flex;gap:10px}
-.kc{width:min(29vw,190px);padding:12px 10px 10px;border-radius:18px;border:3px solid var(--line);background:linear-gradient(180deg,#2F4A85,#1B2D4F);
+.kc{width:min(calc(29 * var(--vw, 1vw)),190px);padding:12px 10px 10px;border-radius:18px;border:3px solid var(--line);background:linear-gradient(180deg,#2F4A85,#1B2D4F);
     box-shadow:0 6px 0 rgba(0,0,0,.4);text-align:center;color:#fff;animation:kcIn .35s cubic-bezier(.2,1.6,.4,1) both}
 .kc:active{transform:translateY(4px)}
 .kc .ic{font-size:34px;line-height:1.1}
@@ -493,7 +497,7 @@ input:focus{outline:none;border-color:var(--yellow)}
 .kc .ds{font-size:11px;font-weight:700;line-height:1.45;color:#DDE6FF;margin-top:4px;min-height:32px}
 .kc .st{font-size:10px;color:var(--dim);font-weight:700;margin-top:4px}
 @keyframes kcIn{from{transform:translateY(30px) scale(.8);opacity:0}}
-.cards .tbar{width:min(80vw,560px);height:6px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden}
+.cards .tbar{width:min(calc(80 * var(--vw, 1vw)),560px);height:6px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden}
 .cards .tbar i{display:block;height:100%;background:var(--teal)}
 .cards .hint{font-size:11px;color:var(--dim);font-weight:700}
 /* ── 공격 버튼 전투 ── */
@@ -803,19 +807,36 @@ const socket = io({ transports: ["websocket", "polling"] });
 SFX.setMusic && SFX.setMusic(false);   // 폰은 배경음악 파일을 받지 않음 (50~60대가 동시에 받으면 와이파이·서버가 막힘) — 음악은 메인 화면에서, 폰은 효과음만
 /* ── 연결 지킴이: 서버 소식이 끊기면 띠로 알리고 빨리 다시 연결합니다
       (아이폰은 앱 전환·화면 잠금 뒤 끊긴 연결을 한참 모르고 멈춘 화면으로 있을 때가 있음) ── */
-let lastRx = Date.now(), netBad = false, kickAt = 0;
+/*   · 입장한 뒤(rxExpected)에만 '조용함'을 따짐 — 입장 전 화면엔 서버가 주기적으로 보내는 게 없음
+     · 바로 끊지 않고 먼저 ping2 로 물어본 뒤, 2.5초 안에 아무 대답이 없을 때만 다시 연결 (쌓여 있던 소식을 버리지 않게)
+     · 출전을 눌렀는데 6초 안에 대답이 없으면 같은 방법으로 확인하고, 다시 연결되면 출전 신호를 다시 보냄 */
+let lastRx = Date.now(), netBad = false, kickAt = 0, rxExpected = false, probeT = 0, discAt = 0, pendingJoin = null, joinSentAt = 0;
 socket.onAny(() => { lastRx = Date.now(); });
+socket.on("disconnect", () => { rxExpected = false; discAt = Date.now(); });
 function forceReconnect(){
-  if (Date.now() - kickAt < 6000) return; kickAt = Date.now();
+  if (Date.now() - kickAt < 8000) return; kickAt = Date.now();
   try { if (socket.connected && socket.io.engine) socket.io.engine.close(); else socket.connect(); } catch (e) {}
 }
+function probe(){                                   // 살아 있는지 물어보고, 대답이 없으면 다시 연결
+  if (probeT || !socket.connected) return;
+  const t0 = Date.now();
+  try { socket.emit("ping2", t0); } catch (e) {}
+  probeT = setTimeout(() => { probeT = 0; if (lastRx < t0 && socket.connected) forceReconnect(); }, 2500);
+}
 setInterval(() => {
-  const silent = Date.now() - lastRx, visible = document.visibilityState !== "hidden";
-  const bad = !socket.connected || silent > 4000;
+  const now = Date.now(), silent = now - lastRx, visible = document.visibilityState !== "hidden";
+  if (socket.connected) discAt = 0; else if (!discAt) discAt = now;
+  const bad = (!socket.connected && now - discAt > 2000) || (rxExpected && silent > 4000);
   if (bad !== netBad) { netBad = bad; document.getElementById("netwarn").classList.toggle("on", bad); }
-  if (visible && socket.connected && silent > 6000 + Math.random() * 2000) forceReconnect();   // 서버 소식이 0.7초마다 오는데 6~8초 조용하면 끊긴 것
+  if (!visible || !socket.connected) return;
+  if (rxExpected && silent > 5000 + Math.random() * 3000) probe();                    // 입장한 폰엔 0.7초마다 소식이 오는데 5초 넘게 조용함
+  if (pendingJoin && now - joinSentAt > 6000) { joinSentAt = now; probe(); }         // 출전을 눌렀는데 대답이 없음
 }, 1000);
-function wakeUp(){ if (Date.now() - lastRx > 2500) forceReconnect(); if (!MAPI) loadMap(); }
+function wakeUp(){
+  if (!socket.connected) { try { socket.connect(); } catch (e) {} }
+  else if ((rxExpected || pendingJoin) && Date.now() - lastRx > 2500) probe();
+  if (!MAPI) loadMap();
+}
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") wakeUp(); });
 addEventListener("pageshow", (e) => { if (e.persisted) wakeUp(); });
 addEventListener("online", wakeUp);
@@ -877,6 +898,7 @@ function checkRotate(){
   FORCE_ROT = portrait;
   const st = document.documentElement.style;
   st.setProperty("--fw", innerHeight + "px"); st.setProperty("--fh", innerWidth + "px");
+  st.setProperty("--vw", portrait ? (innerHeight / 100) + "px" : "1vw");   // 돌린 화면의 '가로 1%
   document.body.classList.toggle("forceland", portrait);
   fitCanvas();
 }
@@ -932,9 +954,13 @@ $("nm").addEventListener("input", refresh);
 $("nm").addEventListener("blur", () => { if (window.__resetZoom) window.__resetZoom(); });
 if (me?.name) $("nm").value = me.name;
 buildRows(); refresh();
-$("go").onclick = () => { SFX.init(); SFX.play("go"); goLandscape(); socket.emit("join", { name: $("nm").value.trim(), look, id: me?.id }); };
+$("go").onclick = () => { if (pendingJoin && Date.now() - joinSentAt < 1500) return;   // 두 번 눌림 방지
+  SFX.init(); SFX.play("go"); goLandscape();
+  pendingJoin = { name: $("nm").value.trim(), look, id: me?.id }; joinSentAt = Date.now();
+  if (socket.connected) socket.emit("join", pendingJoin); };                          // 끊겨 있으면 다시 연결될 때 보냄 (두 번 가지 않게)
 $("helpbtn").onclick = () => { SFX.play("click"); $("helpbox").classList.add("on"); };
 $("helpclose").onclick = () => $("helpbox").classList.remove("on");
+$("helpbox").addEventListener("click", (e) => { if (e.target.id === "helpbox") $("helpbox").classList.remove("on"); });   // 빈 곳을 눌러도 닫힘
 
 /* 오프닝 */
 (function(){
@@ -977,17 +1003,29 @@ fetch("/api/join-info").then(r => r.json()).then(d => {
 
 /* ── 지형 ── */
 const SOLID = PX.SOLID;
-let mapLoading = false, mapRetryT = 0, mapTries = 0;
+let mapLoading = false, mapRetryT = 0, mapTries = 0, mapAgain = false, mapWant = null;
 function loadMap(){
-  if (mapLoading) return; mapLoading = true; clearTimeout(mapRetryT); mapRetryT = 0;
-  fetch("/api/map", { cache: "no-store" }).then(r => { if (!r.ok) throw new Error("지도 " + r.status); return r.json(); }).then(m => {
+  if (mapLoading) { mapAgain = true; return; }                       // 받는 중에 지도가 바뀌면 끝난 뒤 한 번 더
+  mapLoading = true; mapAgain = false; clearTimeout(mapRetryT); mapRetryT = 0;
+  let over = false;
+  const ctl = window.AbortController ? new AbortController() : null;
+  const fail = () => { if (over) return; over = true; clearTimeout(to); mapLoading = false; mapTries++;
+    mapRetryT = setTimeout(() => { mapRetryT = 0; loadMap(); }, Math.min(3000, 600 * mapTries)); };   // 실패하면 곧 다시
+  const to = setTimeout(() => { try { ctl && ctl.abort(); } catch (e) {} fail(); }, 8000);           // 8초 안에 안 오면 다시
+  fetch("/api/map", ctl ? { cache: "no-store", signal: ctl.signal } : { cache: "no-store" }).then(r => { if (!r.ok) throw new Error("지도 " + r.status); return r.json(); }).then(m => {
+    if (over) return;
     if (!m || !m.tiles || !m.TW || !m.TH || !m.TS) throw new Error("지도 자료 이상");
     const bin = atob(m.tiles), t = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) t[i] = bin.charCodeAt(i);
     if (t.length < m.TW * m.TH) throw new Error("지도 크기 이상");
     MAPI = { ...m, t }; mapCv = true; PX.tileset(m.TS); mapTries = 0;   // 타일셋만 준비, 보이는 칸만 그립니다
-  }).catch(() => { mapTries++; clearTimeout(mapRetryT); mapRetryT = setTimeout(() => { mapRetryT = 0; loadMap(); }, Math.min(3000, 600 * mapTries)); })   // 실패하면 곧 다시
-    .then(() => { mapLoading = false; });
+    over = true; clearTimeout(to); mapLoading = false;
+    if (mapAgain || (mapWant != null && m.seq != null && m.seq !== mapWant)) { mapAgain = false; setTimeout(loadMap, 100); }
+  }).catch(fail);
+}
+function checkMapSeq(seq){                                             // 서버 지도 번호와 다르면 다시 받기 (끊긴 사이·받는 중에 바뀐 경우)
+  if (seq == null) return; mapWant = seq;
+  if (MAPI && MAPI.seq != null && MAPI.seq !== seq && !mapLoading && !mapRetryT) loadMap();
 }
 loadMap();
 const tileAt = (x, y) => { if (!MAPI) return 1; const tx = x / MAPI.TS | 0, ty = y / MAPI.TS | 0;
@@ -1036,7 +1074,9 @@ function posAt(v, t){
 /* ── 소켓 ── */
 /* 다시 접속하면 자동으로 이어 붙되, 판과 판 사이(대기실·결과)라면 캐릭터 만들기 화면을 이전 설정으로 보여 줍니다 */
 let autoJoining = false;
-socket.on("connect", () => { lastRx = Date.now(); loadMap(); if (me) { autoJoining = true; socket.emit("join", { name: me.name, look: me.look, id: me.id }); } });
+socket.on("connect", () => { lastRx = Date.now(); rxExpected = false;
+  if (pendingJoin) { joinSentAt = Date.now(); socket.emit("join", pendingJoin); }
+  else if (me) { autoJoining = true; socket.emit("join", { name: me.name, look: me.look, id: me.id }); } });
 function showMake(hint){
   $("over").classList.remove("on"); $("result").classList.remove("on"); $("play").classList.remove("on"); $("make").classList.remove("hide");
   if (me) { $("nm").value = me.name; look = { ...me.look }; }
@@ -1045,10 +1085,10 @@ function showMake(hint){
 socket.on("roster", (r) => { roster = new Map(r.list.map(p => [p.u, p])); TEAMS = r.teams || []; MODE = r.mode; });
 socket.on("mapChanged", () => loadMap());
 socket.on("joined", (p) => {
-  me = p; look = p.look; lsSet(KEY, p); pickedOid = 0;
+  me = p; look = p.look; lsSet(KEY, p); pickedOid = 0; pendingJoin = null; rxExpected = true; lastRx = Date.now();
   if (p.ph === "countdown" || p.ph === "playing" || p.ph === "paused") { $("over").classList.remove("on"); $("result").classList.remove("on"); }   // 지난 판 결과 화면에 갇히지 않게
   const between = p.ph === "lobby" || p.ph === "ended", wasAuto = autoJoining; autoJoining = false;
-  if (wasAuto && between) { showMake("지난번 캐릭터예요 — 이름·모습을 바꾸거나 그대로 출전!"); return; }
+  if (wasAuto && between && !$("play").classList.contains("on")) { showMake("지난번 캐릭터예요 — 이름·모습을 바꾸거나 그대로 출전!"); return; }   // 처음 열었을 때만
   $("mkhint").textContent = "";
   $("make").classList.add("hide"); $("play").classList.add("on");
   PX.portrait($("h-av"), 26, 26, p.look, { crop: "head" });
@@ -1057,7 +1097,8 @@ socket.on("joined", (p) => {
   const it = PX.ITEMS.find(i => i.id === p.cls); if (it) { $("ult-ic").textContent = it.uicon; toast(`${it.name} — 궁극기 ${it.uicon} ${it.ult}`, 4000); }
   SFX.play("join"); fitCanvas(); keepAwake();
 });
-socket.on("joinError", (m) => { $("err").textContent = m; buzz(120); });
+socket.on("joinError", (m) => { const wasAuto = autoJoining; pendingJoin = null; autoJoining = false; $("err").textContent = m; buzz(120);
+  if (wasAuto && $("make").classList.contains("hide")) showMake(m); });   // 다시 연결하며 자동 입장이 거절된 경우만 만들기 화면에서 알려 줌
 socket.on("kicked", () => { try { localStorage.removeItem(KEY); } catch {} location.reload(); });
 socket.on("resetToLobby", () => { $("over").classList.remove("on"); $("result").classList.remove("on");
   if (me) showMake("새 판! 이름·캐릭터를 바꿀 수 있어요 — 그대로 출전해도 돼요");
@@ -1067,7 +1108,7 @@ socket.on("portal", (p) => { if (p && p.x != null) { P.x = p.x; P.y = p.y; CAM.x
   buzz(40); SFX.play("portal"); spark(cv.clientWidth/2, cv.clientHeight/2, "#B39CFF", 22, 3);
   flash("radial-gradient(circle,rgba(155,92,255,.45),transparent 72%)"); toast("🌀 순간이동!", 1400); });
 socket.on("me", (f) => {
-  F = f;
+  F = f; checkMapSeq(f.mapSeq);
   // 서버에는 문제가 없는데 폰에만 문제 창이 남아 있으면 닫기 (끊겼다 돌아온 경우 등)
   if (D && !f.dl && Date.now() - duelShownAt > 1500) { paintHud.noDl = (paintHud.noDl || 0) + 1; if (paintHud.noDl >= 3) { paintHud.noDl = 0; socket.listeners("duelEnd")[0]({ kind: "cancel", result: "cancel" }); } } else paintHud.noDl = 0;
   if ((f.ph === "countdown" || f.ph === "playing") && $("over").classList.contains("on")) { $("over").classList.remove("on"); $("result").classList.remove("on"); }
