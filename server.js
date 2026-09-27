@@ -310,6 +310,7 @@ let pauseStart = 0, pauseTotal = 0;          // 일시정지 동안에는 게임
 const rawNow = () => TIME_SCALE === 1 ? Date.now() : T_START + (Date.now() - T_START) * TIME_SCALE;
 const now = () => (pauseStart || rawNow()) - pauseTotal;
 const later = (ms, f) => setTimeout(f, ms / TIME_SCALE);
+let pickSeq = 0;                                          // 답한 순서 번호
 function pushLog(t, tone = "") { G.log.unshift({ t, tone }); if (G.log.length > 30) G.log.pop(); }
 function bigEvent(text, tone = "") { G.events.push({ text, tone }); if (G.events.length > 6) G.events.shift(); }
 function fx(o) { G.fx.push(o); if (G.fx.length > 40) G.fx.shift(); }
@@ -395,7 +396,7 @@ function freshStats(p) {
   Object.assign(p, {
     st: "ok", hp: HP0, mhp: HP0, atk: ATK0, perk: {}, guard: p.cls === "shield" ? 2 : 0,
     lastHurt: 0, downAt: 0, bleedUntil: 0, elimAt: 0, place: 0, killedBy: "", teamSaved: 0, atkCool: 0, attacks: 0,
-    reviveGot: 0, reviveNext: 0, revNext: 0,
+    reviveGot: 0, reviveNext: 0, revNext: 0, revBy: null,
     ultReady: 0, ultArm: null, ultArmUntil: 0, lampLeft: 0, ultShieldUntil: 0, immuneUntil: 0,
     prayShield: 0, prayCoolUntil: 0, prayTarget: null, prayPts: 0, prayOn: false, prayNext: 0,
     pendingCards: [],
@@ -650,7 +651,7 @@ function finish(w) {
   for (const d of [...G.duels.values()]) closeDuel(d);
   G.judge = null;
   G.winAt = t;
-  later(2600, () => endGame());
+  const gs = G.gameSeq; later(2600, () => { if (G.gameSeq === gs) endGame(); });
 }
 function quest(p, id, add) {
   if (!QUESTS.some((q) => q.id === id) || p.qDone[id]) return;
@@ -1166,7 +1167,7 @@ function judgeResolve() {
   if (out.length === rows.length) out = [];                          // 모두 틀리면 아무도 탈락하지 않음
   const okRows = rows.filter((r) => r.ok);
   if (!teamCount() && okRows.length > 1 && J.round >= 2) {          // 개인전 2라운드부터: 맞힌 사람 중 가장 늦은 사람도 탈락
-    const slow = okRows.slice().sort((a, b) => b.at - a.at)[0]; slow.slow = true; out = [...out, slow];
+    const slow = okRows.slice().sort((a, b) => (b.at - a.at) || ((b.pk ? b.pk.n || 0 : 0) - (a.pk ? a.pk.n || 0 : 0)))[0]; slow.slow = true; out = [...out, slow];
   }
   if (teamCount()) {                                                  // 팀전: 한 팀만 남으면 그 팀 우승이므로 나머지 팀만 판정
     const left = new Set(rows.filter((r) => !out.includes(r)).map((r) => r.p.team));
@@ -1249,7 +1250,7 @@ function updateFlood(t) {
   if (G.stage === "grow") {
     if (f >= GROW_END - 30000 / T) once("warn0", () => { pushLog("⚠ 30초 뒤 홍수! 그때부터는 쓰러지면 탈락입니다", "warn"); bigEvent("⚠ 30초 뒤 홍수 — 이제 부활 없음!", "warn"); });
     if (f >= GROW_END) {
-      G.stage = "flood";
+      G.stage = "flood"; G.floodAt = t;
       for (const p of G.players.values()) if (p.st === "ok") heal(p, p.mhp * .4);   // 숨 고르기: 모두 체력 40% 회복
       pushLog("🌊 홍수가 시작됐습니다! 모두 체력 40% 회복 — 이제 쓰러지면 탈락", "warn");
       bigEvent("🌊 홍수 시작! 이제 쓰러지면 탈락", "warn");
@@ -1408,7 +1409,7 @@ function stepRevive(p, t) {
     if (t >= p.downAt + REVIVE_MIN_MS) { const s = farSpot(220, G.stage !== "grow"); reviveAt(p, s.x, s.y, REVIVE_HP, "quiz"); pushLog(`✨ ${p.name} 부활!`); }
     return;
   }
-  if (G.stage !== "grow" && t - p.downAt > 50000) { p.killedBy = p.killedBy || "부활 실패"; eliminate(p, null); checkWin(); return; }
+  if (G.stage !== "grow" && t - Math.max(p.downAt, G.floodAt || 0) > 50000) { p.killedBy = p.killedBy || "부활 실패"; eliminate(p, null); checkWin(); return; }
   if (t >= p.reviveNext && p.connected) startSoloQuiz(p, "revive", null, 16);
 }
 
@@ -1432,7 +1433,7 @@ function step(dt, t) {
     const regen = G.stage === "grow" ? REGEN_RATE * (p.cls === "harp" ? 2 : 1) : p.cls === "harp" ? REGEN_RATE * .5 : 0;
     if (regen && t - p.lastHurt > REGEN_DELAY && p.hp < p.mhp) heal(p, p.mhp * regen * dt);
     // 홍수: 물속에 있으면 체력이 깎입니다 (홍해 가르기·대결 중엔 무사 — 대결 중엔 움직일 수 없으니까)
-    if (G.floodIdx >= 0 && t >= p.immuneUntil && !p.duel && !inZone(p.x, p.y)) {
+    if (G.floodIdx >= 0 && t >= p.immuneUntil && t >= p.safeUntil && !p.duel && !inZone(p.x, p.y)) {
       p.floodAcc = (p.floodAcc || 0) + p.mhp * G.floodPlan[G.floodIdx].dps * dt;
       if (p.floodAcc >= 1) {
         const n = Math.floor(p.floodAcc); p.floodAcc -= n;
@@ -1624,13 +1625,14 @@ function updateBoss(dt, t) {
   const arkStage = G.floodIdx >= ARK;
   for (const b of G.bosses) {
     if (b.dead) {
+      if (b.extra) { b.gone = true; continue; }
       if (t >= b.respawnAt && !arkStage) {
         // 죽은 보스는 다른 종류로 바뀌어 다시 나타납니다 (리워야단은 한 번만)
         let nextType = BOSS_ROTATION[Math.random() * BOSS_ROTATION.length | 0];
         if (nextType === b.type) nextType = BOSS_ROTATION[(BOSS_ROTATION.indexOf(nextType) + 1) % BOSS_ROTATION.length];
         const s = farSpot(350);                         // 사람들에게서 먼 임의의 장소에 다시 등장
         Object.assign(b, { type: nextType, x: s.x, y: s.y, dead: false, walk: 0, busyUntil: 0, tpNext: 0 });
-        if (nextType === "amalek") spawnBoss("amalek");
+        if (nextType === "amalek" && G.bosses.length < (G.bossBase || 3) + 2) spawnBoss("amalek").extra = true;   // 짝은 붙이되 전체 수는 처음보다 2마리까지만
         pushLog(`⚔ ${BOSSES[nextType].name} 등장!`, "hot");
       }
       continue;
@@ -1694,6 +1696,7 @@ function updateBoss(dt, t) {
     if (target && bd < 260 && t > (target.aggroAt || 0)) { target.aggroAt = t + 6000;
       if (target.socketId) io.to(target.socketId).emit("aggro", { name: B.name, type: b.type, x: b.x | 0, y: b.y | 0 }); }
   }
+  if (G.bosses.some((b) => b.gone)) G.bosses = G.bosses.filter((b) => !b.gone);   // 덤으로 생겼던 아말렉은 쓰러지면 치움
 }
 function updateTreasure(t) {
   if (G.treasure || t < G.nextTreasure || G.stage !== "grow") { if (G.treasure && G.stage !== "grow") G.treasure = null; return; }
@@ -1965,6 +1968,7 @@ function pruneGone() {
   return n;
 }
 function startGame(min) {
+  G.gameSeq = (G.gameSeq || 0) + 1; G.floodAt = 0;
   HEALTH.quietUntil = Date.now() + 8000; HEALTH.hist = []; HEALTH.slow = false;   // 시작 순간의 부하는 '버거움'으로 치지 않음
   pruneGone();
   MAP = buildMap(...mapSizeFor(Math.max(2, G.players.size)));
@@ -1998,7 +2002,7 @@ function beginPlay() {
   G.floodPlan = planFlood();
   G.bosses = []; G.leviathanDone = false; G.minions = []; fillMinions();
   // 최소 3마리, 8명마다 한 마리씩 추가 (60명이면 9마리). 종류는 골고루
-  const want = 3 + Math.floor(G.players.size / 8);
+  const want = 3 + Math.floor(G.players.size / 8); G.bossBase = want;
   const order = ["goliath", "lion", "pharaoh", "serpent", "herod", "nebuchad", "amalek", "goliath", "lion", "pharaoh", "serpent"];
   let count = 0;
   for (let i = 0; count < want; i++) { const tp = order[i % order.length]; spawnBoss(tp); count++; if (tp === "amalek" && count < want) { spawnBoss("amalek"); count++; } }
@@ -2134,6 +2138,7 @@ function saveResults(ranked, wrongs) {
   try { fs.writeFileSync(file, csv); console.log("  결과 저장:", file); } catch {}
 }
 function resetToLobby() {
+  G.gameSeq = (G.gameSeq || 0) + 1;
   if (pauseStart) { pauseTotal += rawNow() - pauseStart; pauseStart = 0; }
   G.phase = "lobby"; G.duels.clear(); G.log = []; G.events = []; G.fx = []; G.usedQ.clear();
   Object.assign(G, { boxes: [], opened: [], bosses: [], minions: [], treasure: null, featured: null, leaderId: null,
@@ -2283,6 +2288,7 @@ io.on("connection", (socket) => {
     if (c.err) return socket.emit("joinError", c.err);
     const L = LOOK(look);
     let p = id && G.players.get(id), changed = false;
+    if (!p) p = [...G.players.values()].find((x) => x.name === c.name && !x.connected) || null;
     if (!p) {
       if ([...G.players.values()].some((x) => x.name === c.name && x.connected))
         return socket.emit("joinError", "같은 이름이 있어요. 한 글자만 바꿔 주세요.");
@@ -2306,7 +2312,7 @@ io.on("connection", (socket) => {
           p.catchUpUntil = now() + 120000;               // 2분 동안 경험치 2배
           p.ultReady = now() + 30000;                    // 궁극기는 30초 뒤
           p.keys = 1;
-          later(1500, () => offerCards(p, p.level, "gift", 1));        // 지각 선물: 희귀 카드 1장 고르기
+          { const gs = G.gameSeq; later(1500, () => { if (G.gameSeq === gs && G.players.get(p.id) === p) offerCards(p, p.level, "gift", 1); }); }   // 지각 선물: 희귀 카드 1장 고르기
           const sp = joinSpot(); p.x = sp.x; p.y = sp.y;
           p.lateJoin = true; G.participants.add(p.id);
           pushLog(`${c.name} 지각 입장! Lv${startLv} 지원 · 2분간 경험치 2배`, "hot");
@@ -2410,7 +2416,7 @@ io.on("connection", (socket) => {
     const c = +o.choice;
     if (!(c >= 0 && c <= 3) || (d.hide[p.id] || []).includes(c)) return;
     const ok = c === d.q.answer;
-    d.picks[p.id] = { choice: c, correct: ok, at: now() };
+    d.picks[p.id] = { choice: c, correct: ok, at: now(), n: ++pickSeq };   // n: 답한 순서 (멈춤 중엔 시계가 멈춰 at 이 같아짐)
     if (d.kind === "pvp" || d.kind === "boss" || d.kind === "sermon" || d.kind === "attack" || d.kind === "minion") { p.answered++; if (ok) p.correct++; }
     if (d.kind === "judge") { socket.emit("submitted", { judge: true }); return judgeAnswered(); }
     if (d.kind !== "pvp") return resolveDuel(d);           // 혼자 푸는 문제는 바로 판정
@@ -2457,7 +2463,7 @@ io.on("connection", (socket) => {
       }
       effect = "8초 무적 · 빠른 이동 · 홍수 피해 없음" + (n ? ` · ${n}명 밀어냄` : "");
     } else if (p.cls === "scroll") {
-      const targets = [...G.players.values()].filter((o) => o !== p && fighting(o) && enemies(p, o) && !o.duel && o.connected && t >= o.immuneUntil && Math.hypot(o.x - p.x, o.y - p.y) <= 260)
+      const targets = [...G.players.values()].filter((o) => o !== p && fighting(o) && enemies(p, o) && !o.duel && o.connected && t >= o.immuneUntil && t >= o.safeUntil && t >= o.dodgeUntil && Math.hypot(o.x - p.x, o.y - p.y) <= 260)
         .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y)).slice(0, 6);
       if (!targets.length) return socket.emit("ultNo", { msg: "주변(6칸 안)에 적이 없어요 — 가까이 가서 쓰세요" });
       startSermon(p, targets); effect = `${targets.length}명에게 말씀 선포!`;
